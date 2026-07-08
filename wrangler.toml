@@ -43,5 +43,5 @@ CATCHALL_CLIENT_ID = "0"
 [[d1_databases]]
 binding = "DB"
 database_name = "tier2tickets-relay"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "fe2efa6c-f7d4-439b-adfd-3dc10ee0caa5"
 migrations_dir = "migrations"
