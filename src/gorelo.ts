@@ -69,10 +69,9 @@ export class GoreloClient {
   }
 
   /**
-   * GET /v1/assets/agents — the whole agent fleet (no query params).
-   * TODO(verify #4): confirm the endpoint returns the entire fleet in one call.
-   * If it is paginated, this must loop pages. Handles both a bare array and a
-   * common { items: [...] } / { data: [...] } envelope defensively.
+   * GET /v1/assets/agents — the whole agent fleet.
+   * CONFIRMED (swagger): returns a bare array with no query params / pagination.
+   * asArray still tolerates an envelope defensively.
    */
   async listAgents(): Promise<PublicDeviceResponse[]> {
     const raw = await this.getJsonWithRetry<unknown>("/v1/assets/agents");
@@ -132,17 +131,19 @@ function asArray<T>(raw: unknown): T[] {
 }
 
 /**
- * Extract the ticket number from a POST /v1/tickets response.
- * TODO(verify #3): confirm which field carries the number
- * (ticketNumber / number / id). Parsed defensively; log the raw response on the
- * first successful create so it can be pinned.
+ * Extract the ticket identifier from a POST /v1/tickets response.
+ * CONFIRMED (swagger CreatePublicTicketResult): the response is
+ * `{ "ticketId": "<uuid>" }` — a GUID, not a human ticket number (Gorelo's
+ * public API exposes no ticket-number field and no GET-ticket endpoint). We
+ * return the ticketId as the osTicket-style body; Tier2 only needs a non-empty
+ * 201 body. `ticketId` is checked first; the rest are defensive fallbacks.
  */
 export function extractTicketNumber(raw: unknown): string | null {
   if (raw == null) return null;
   if (typeof raw === "string" || typeof raw === "number") return String(raw);
   if (typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
-    for (const key of ["ticketNumber", "number", "ticketId", "id"]) {
+    for (const key of ["ticketId", "ticketNumber", "number", "id"]) {
       const v = obj[key];
       if (typeof v === "string" || typeof v === "number") return String(v);
     }

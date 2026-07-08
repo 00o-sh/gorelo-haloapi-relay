@@ -91,9 +91,11 @@ describe("ticket create handler", () => {
   it("known machine -> 201 + ticket number, correct command mapping (JSON)", async () => {
     route("GET", isContacts, () => json(200, [{ id: 55, primaryEmail: "user@corp.com", clientId: 10 }]));
     let posted: Record<string, unknown> | undefined;
+    // CONFIRMED (swagger CreatePublicTicketResult): the create returns { ticketId: uuid }.
+    const TICKET_ID = "550e8400-e29b-41d4-a716-446655440000";
     route("POST", isTickets, async (req) => {
       posted = (await req.json()) as Record<string, unknown>;
-      return json(201, { ticketNumber: "INC-42" });
+      return json(200, { ticketId: TICKET_ID });
     });
 
     const body = JSON.stringify({
@@ -105,7 +107,7 @@ describe("ticket create handler", () => {
     const res = await dispatch(post(body, "application/json"));
 
     expect(res.status).toBe(201);
-    expect(await res.text()).toBe("INC-42");
+    expect(await res.text()).toBe(TICKET_ID);
 
     expect(posted).toMatchObject({
       title: "Printer down",

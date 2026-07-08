@@ -45,10 +45,14 @@ export interface CreatePublicTicketCommand {
   typeId: number; // required (non-nullable)
   priorityId: PublicTicketPriority; // required (non-nullable)
   sourceId: TicketSource; // required (non-nullable)
-  // TODO(verify #2): item type is string agent id (as read from PublicDeviceResponse.id).
-  // If create rejects, try numbers instead and log the response body.
+  // CONFIRMED (swagger): items are string UUIDs (PublicDeviceResponse.id is a uuid).
   agentAssetIds: string[];
   sendTicketCreatedEmail: boolean;
+}
+
+/** POST /v1/tickets response. CONFIRMED (swagger CreatePublicTicketResult): only a uuid. */
+export interface CreatePublicTicketResult {
+  ticketId: string | null;
 }
 
 /** GET /v1/assets/agents item. NOTE: no MAC field exists. `id` is a STRING. */

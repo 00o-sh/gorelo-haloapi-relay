@@ -162,31 +162,36 @@ npm test            # vitest (workers pool)
 
 Coverage: tag parse + strip, body parsing (JSON + form), matcher (hostname / UPN
 / domain / catch-all + normalization), osTicket→`CreatePublicTicketCommand`
-mapping with Gorelo calls mocked, `201` success + number, and `502` on Gorelo
+mapping with Gorelo calls mocked, `201` success + id, and `502` on Gorelo
 failure.
 
-## ⚠ Runtime-verify checklist (confirm against the live Gorelo before/at deploy)
+## Runtime-verify checklist
 
-The Gorelo host may be unreachable from CI; these items are coded defensively and
-marked with `TODO(verify #n)` in the source. Confirm each once, then pin it:
+A snapshot of the live spec is captured at [`docs/gorelo-swagger.v1.json`](docs/gorelo-swagger.v1.json)
+(v1, captured 2026-07-08). It resolved most of the original open items:
 
-1. **Dispatcher Rule variable syntax** (`src/parse.ts`) — confirm the portal
-   emits `[[hdb host={hostname} mac={mac} ip={ip}]]` (or adjust the documented
-   tag). The parser tolerates ordering/whitespace/quotes and the `hostname` alias.
-2. **`agentAssetIds` item type** (`src/types.ts`, `src/ticket.ts`) — we send the
-   **string** agent `id` as read. If `POST /v1/tickets` rejects it, switch to
-   ints; the create logs the upstream response body on failure.
-3. **`POST /v1/tickets` response shape** (`src/gorelo.ts extractTicketNumber`) —
-   confirm which field carries the ticket number (`ticketNumber` / `number` /
-   `id`). Parsed defensively; the raw response is logged on every create so the
-   real shape can be pinned.
-4. **`GET /v1/assets/agents` pagination** (`src/gorelo.ts listAgents`) — confirm
-   it returns the whole fleet in one call. If paginated, `syncAll()` must loop
-   pages (currently handles a bare array or an `items`/`data`/`results` envelope).
-5. **Priority/source enum labels** (`wrangler.toml`) — the spec ships
-   `PublicTicketPriority=[0..4]` and `TicketSource=[1..6]` **without labels**.
-   Confirm which ints map to your desired default priority and the
-   "integration/portal/API" source, then set `DEFAULT_PRIORITY` / `DEFAULT_SOURCE`.
+- ✅ **`agentAssetIds` item type** — confirmed `string` (uuid); `PublicDeviceResponse.id`
+  is a uuid. Handled as-is.
+- ✅ **`POST /v1/tickets` response shape** — confirmed `CreatePublicTicketResult =
+  { "ticketId": "<uuid>" }`. There is **no** human ticket-number field and **no**
+  GET-ticket/list-tickets endpoint, so the 201 body we return to Tier2 is the
+  ticket **uuid**. That's fine for the Integration Test (it just needs a non-empty
+  201 body); `extractTicketNumber` reads `ticketId` first.
+- ✅ **`GET /v1/assets/agents` pagination** — confirmed a bare array, no query
+  params / pagination. Single call fetches the whole fleet.
+
+Still to confirm against your tenant / portal:
+
+1. **Dispatcher Rule variable syntax** (`src/parse.ts`) — confirm the Helpdesk
+   Buttons portal actually emits `[[hdb host={hostname} mac={mac} ip={ip}]]`
+   (the parser tolerates ordering/whitespace/quotes and the `hostname` alias).
+2. **Priority/source enum labels** (`wrangler.toml`) — the spec ships
+   `PublicTicketPriority=[0..4]` and `TicketSource=[1..6]` as **bare int enums with
+   no labels**, and there is **no list endpoint** for them (and no GET-ticket
+   endpoint to read a ticket back), so the API cannot reveal the mapping. Read the
+   labels off the priority/source dropdowns in the Gorelo ticket UI, then set
+   `DEFAULT_PRIORITY` / `DEFAULT_SOURCE`. Current values (`2` / `4`) are valid ints,
+   so tickets still create — they may just carry a non-ideal label until confirmed.
 
 Gorelo API base: `https://api.usw.gorelo.io` (US) / `https://api.aue.gorelo.io`
 (AU). Spec: `https://api.usw.gorelo.io/swagger/v1/swagger.json`. Auth header:
