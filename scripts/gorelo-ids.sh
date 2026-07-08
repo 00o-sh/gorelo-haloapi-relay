@@ -64,10 +64,10 @@ dump() {
 ROWS='(if type=="array" then . else (.items // .data // .results // .value // []) end) | .[] | "\(.id)\t\(.name)"'
 CLIENT_ROWS='(if type=="array" then . else (.items // .data // .results // .value // []) end) | .[] | "\(.id)\t\(.name)\tdomains=\([.domains[]? | (.domain // .name)] | join(","))"'
 
-echo "=== Groups  (GET /v1/organization/groups)  -> DEFAULT_GROUP_ID ==="
-dump /v1/organization/groups "${ROWS}"
+# NOTE: DEFAULT_GROUP_ID is intentionally NOT fetched here. GET /v1/organization/groups
+# requires the 'Organization' scope, and the Worker never calls it at runtime — get the
+# group id from the Gorelo UI (Admin -> Teams/Groups) once.
 
-echo
 echo "=== Ticket types  (GET /v1/tickets/types)  -> DEFAULT_TYPE_ID ==="
 dump /v1/tickets/types "${ROWS}"
 
@@ -79,7 +79,25 @@ echo
 echo "=== Clients  (GET /v1/clients)  -> CATCHALL_CLIENT_ID + domain mirror ==="
 dump /v1/clients "${CLIENT_ROWS}"
 
+# --- Priority / source enum discovery -------------------------------------------------
+# PublicTicketPriority=[0..4] and TicketSource=[1..6] ship as integer enums WITHOUT labels.
+# Some tenants expose list endpoints (like types/statuses); probe the likely names. If they
+# 404, use the empirical fallback printed at the end.
 echo
-echo "Enums to confirm in the Gorelo UI (spec ships ints without labels):"
-echo "  PublicTicketPriority = [0,1,2,3,4]  -> DEFAULT_PRIORITY"
-echo "  TicketSource         = [1,2,3,4,5,6] -> DEFAULT_SOURCE (pick the integration/portal/API source)"
+echo "=== Priorities (probe) -> DEFAULT_PRIORITY ==="
+for p in /v1/tickets/priorities /v1/tickets/priority; do
+  echo "-> GET ${p}"; dump "${p}" "${ROWS}"
+done
+
+echo
+echo "=== Sources (probe) -> DEFAULT_SOURCE ==="
+for p in /v1/tickets/sources /v1/tickets/source; do
+  echo "-> GET ${p}"; dump "${p}" "${ROWS}"
+done
+
+echo
+echo "If the priority/source probes 404, map the ints empirically:"
+echo "  1. Create a ticket in the Gorelo UI with the priority + source you want."
+echo "  2. Read it back:  curl -H \"X-API-Key: \$GORELO_API_KEY\" \\"
+echo "       \"${BASE_URL}/v1/tickets?take=1&sort=-id\" | jq '.[0] // .items[0] | {id, priorityId, sourceId}'"
+echo "  3. Use those integers for DEFAULT_PRIORITY / DEFAULT_SOURCE."
