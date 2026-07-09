@@ -26,7 +26,13 @@ afterEach(() => {
 function installFetch(): void {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const req = new Request(input as RequestInfo, init);
-    for (const r of routes) if (r.method === req.method && r.match(new URL(req.url))) return r.handler(req);
+    const url = new URL(req.url);
+    for (const r of routes) if (r.method === req.method && r.match(url)) return r.handler(req);
+    // Fallback: the live agent-detail lookup 404s unless a test mocks it (getAgent
+    // tolerates that and falls back to the mirror row). Everything else is an error.
+    if (req.method === "GET" && /^\/v1\/assets\/agents\//.test(url.pathname)) {
+      return new Response("", { status: 404 });
+    }
     throw new Error(`unmocked fetch: ${req.method} ${req.url}`);
   }) as typeof fetch;
 }
@@ -269,10 +275,15 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
       agentAssetIds: [AGENT_UUID],
     });
     const desc = String(posted?.description);
-    // The report is flattened into the body (reporter email + hostname survive).
+    // The report fields are rendered into the HTML body (reporter email survives).
     expect(desc).toContain("user@corp.com");
     // The routing trail records the outcome, incl. location + the linked asset.
-    expect(desc).toContain("Client: 10  Contact: 55  Location: 100  Asset: pc-01 (linked)");
+    expect(desc).toContain(
+      "Client: 10 · Contact: 55 · Location: 100 · Asset: pc-01 (linked)",
+    );
+    // HTML formatting: section headers + line breaks.
+    expect(desc).toContain("<b>Report Summary</b>");
+    expect(desc).toContain("<br>");
     // The notification note is NOT dumped into the body.
     expect(desc).not.toContain("@font-face");
     // the pending row is consumed
@@ -307,8 +318,10 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     });
     expect(res.status).toBe(201);
     const desc = String(cap.posted()?.description);
-    expect(desc).toContain("View Report: https://portal.helpdeskbuttons.com/r/abc");
-    expect(desc).toContain("Connect to Computer: https://portal.helpdeskbuttons.com/c/abc");
+    expect(desc).toContain("View Report");
+    expect(desc).toContain('<a href="https://portal.helpdeskbuttons.com/r/abc">');
+    expect(desc).toContain("Connect to Computer");
+    expect(desc).toContain('<a href="https://portal.helpdeskbuttons.com/c/abc">');
     // The font-CSS boilerplate is still not dumped.
     expect(desc).not.toContain("@font-face");
   });
@@ -362,8 +375,52 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
       body: JSON.stringify([{ ticket_id: haloId, note_html: "x" }]),
     });
     const desc = String(cap.posted()?.description);
-    expect(desc).toContain("Selections: This is an emergency");
+    expect(desc).toContain("Selections:");
+    expect(desc).toContain("This is an emergency");
     expect(desc).not.toContain("This affects only me");
+  });
+
+  it("enriches the ticket with rich device detail from the live Gorelo agent record", async () => {
+    const cap = captureGoreloCreate();
+    routes.push({
+      method: "GET",
+      match: (u) => u.pathname === `/v1/assets/agents/${AGENT_UUID}`,
+      handler: () =>
+        json(200, {
+          id: AGENT_UUID,
+          name: "PC-01",
+          osName: "Microsoft Windows 11 Enterprise",
+          osVersion: "25H2",
+          manufacturer: "Microsoft Corporation",
+          model: "Virtual Machine",
+          cpu: "AMD EPYC 9V74 80-Core Processor",
+          memory: "32",
+          serialNo: "SN-RICH",
+          localIPAddress: "10.100.1.13",
+          publicIPAddress: "68.211.123.114",
+          lastLoggedOnUserUpn: "cmaidan@sph.health",
+          lastBootUpTime: "2026-07-09T07:36:00",
+        }),
+    });
+    const created = await req("/tickets", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ summary: "Test", details_html: reportHtml({ email: "user@corp.com", host: "pc-01" }) }]),
+    });
+    const haloId = ((await created.json()) as { id: number }).id;
+    await req("/actions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ ticket_id: haloId, note_html: "x" }]),
+    });
+    const desc = String(cap.posted()?.description);
+    expect(desc).toContain("<b>Device</b>");
+    expect(desc).toContain("Microsoft Windows 11 Enterprise");
+    expect(desc).toContain("AMD EPYC 9V74 80-Core Processor");
+    expect(desc).toContain("32 GB RAM");
+    expect(desc).toContain("SN SN-RICH");
+    expect(desc).toContain("Last user cmaidan@sph.health");
+    expect(desc).toContain("Last boot 2026-07-09 07:36");
   });
 
   it("routes client + location from the asset object Tier2 sends (site_id 0 fallback)", async () => {

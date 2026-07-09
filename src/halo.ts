@@ -23,6 +23,7 @@ import { ipAllowed } from "./tier2.js";
 import type {
   CreatePublicTicketCommand,
   Env,
+  PublicDeviceResponse,
   PublicTicketPriority,
   TicketSource,
 } from "./types.js";
@@ -457,6 +458,7 @@ interface Routing {
   hostname: string;
   assetMatched: boolean;
   device: DeviceFullRow | null;
+  agentDetail: PublicDeviceResponse | null;
   report: Record<string, string>;
 }
 
@@ -511,6 +513,10 @@ async function resolveRouting(env: Env, t: HaloTicket): Promise<Routing> {
   const agentAssetIds = await resolveAssetUuids(env.DB, t);
   if (device?.agent_id && !agentAssetIds.includes(device.agent_id)) agentAssetIds.push(device.agent_id);
 
+  // Pull the full agent record (cpu/memory/model/OS/last-user) from Gorelo so the
+  // ticket shows the machine detail HDB keeps behind its portal link. Best-effort.
+  const agentDetail = device?.agent_id ? await new GoreloClient(env).getAgent(device.agent_id) : null;
+
   const contactName = contact?.name || report.name || email || "Helpdesk Buttons";
   console.log(
     `HALO routing: reportEmail=${email || "(none)"} hostname=${hostname || "(none)"} ` +
@@ -527,6 +533,7 @@ async function resolveRouting(env: Env, t: HaloTicket): Promise<Routing> {
     hostname,
     assetMatched: agentAssetIds.length > 0,
     device,
+    agentDetail,
     report,
   };
 }
@@ -553,67 +560,152 @@ const DUMP_SKIP = new Set([
   "assets",
 ]);
 
-/** Dump every remaining top-level field Tier2 sent, so nothing is silently lost. */
-function dumpSubmittedFields(t: HaloTicket): string {
+// Gorelo renders the ticket description as HTML (plain newlines collapse), so the
+// body is built as HTML: section headers, <br> line breaks, bulleted selections,
+// and clickable links. All text values are escaped before interpolation.
+const esc = (s: string): string =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+const heading = (title: string): string => `<b>${esc(title)}</b>`;
+
+/** Ordered label/value pairs from the report table, original casing preserved. */
+function parseReportPairs(html: string): Array<{ label: string; value: string }> {
+  const out: Array<{ label: string; value: string }> = [];
+  const re = /<td[^>]*>\s*([^<:]+?)\s*:\s*<\/td>\s*<td[^>]*>\s*([\s\S]*?)\s*<\/td>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const label = m[1]!.trim();
+    const value = decodeEntities(stripTags(m[2]!)).replace(/\s+/g, " ").trim();
+    if (label && value) out.push({ label, value });
+  }
+  return out;
+}
+
+/** Split the Selections value cell into individual items (handles <br>/list markup). */
+function extractSelectionItems(html: string): string[] {
+  const m = /Selections\s*:?\s*<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>/i.exec(html);
+  if (!m) return [];
+  return m[1]!
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|li|tr)\s*>/gi, "\n")
+    .split("\n")
+    .map((s) => decodeEntities(stripTags(s)).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+// Default HDB selections (every press has them) — removed as substrings so they go
+// whether the report lists them separately or concatenated into one string.
+const DEFAULT_SELECTION_RES = [
+  /connect directly to my computer as soon as (?:available|possible)/gi,
+  /this affects only me/gi,
+];
+function cleanSelection(item: string): string {
+  let out = item;
+  for (const re of DEFAULT_SELECTION_RES) out = out.replace(re, "");
+  return out.replace(/\s{2,}/g, " ").replace(/^[\s;,.·•-]+|[\s;,.·•-]+$/g, "").trim();
+}
+
+/** The non-default selections a user actually chose (empty if only defaults). */
+function chosenSelections(html: string, pairs: Array<{ label: string; value: string }>): string[] {
+  let items = extractSelectionItems(html);
+  if (!items.length) {
+    const pair = pairs.find((p) => p.label.toLowerCase() === "selections");
+    if (pair) items = [pair.value];
+  }
+  return items.map(cleanSelection).filter(Boolean);
+}
+
+const nonEmpty = (v: unknown): string => (v == null ? "" : String(v).trim());
+/** Join present parts with " · ", escaped. */
+function dot(parts: unknown[]): string {
+  return parts
+    .map(nonEmpty)
+    .filter(Boolean)
+    .map((s) => esc(s))
+    .join(" · ");
+}
+/** Trim a Gorelo ISO timestamp to "YYYY-MM-DD HH:MM". */
+function shortTime(iso: string): string {
+  return iso ? iso.replace("T", " ").slice(0, 16) : "";
+}
+
+/**
+ * The "Device" section — rich hardware/OS detail from the live Gorelo agent record
+ * (falling back to the mirror row). This is data HDB keeps behind its portal link.
+ */
+function deviceSection(agent: PublicDeviceResponse | null, d: DeviceFullRow | null): string {
+  const name = nonEmpty(agent?.displayName) || nonEmpty(agent?.name) || nonEmpty(d?.display_name) || nonEmpty(d?.hostname);
+  const os = nonEmpty(agent?.osName) || nonEmpty(agent?.os) || nonEmpty(d?.os);
+  const serial = nonEmpty(agent?.serialNo) || nonEmpty(d?.serial);
+  const localIp = nonEmpty(agent?.localIPAddress) || nonEmpty(d?.local_ip);
+  const pubIp = nonEmpty(agent?.publicIPAddress) || nonEmpty(d?.public_ip);
+  if (!name && !serial && !localIp) return "";
+
+  const mem = nonEmpty(agent?.memory) ? `${nonEmpty(agent?.memory)} GB RAM` : "";
+  const model = dot([agent?.manufacturer, agent?.model]);
+  const lastUser = nonEmpty(agent?.lastLoggedOnUserUpn) || nonEmpty(agent?.lastLoggedOnUser);
+  const lastBoot = shortTime(nonEmpty(agent?.lastBootUpTime));
+
+  const lines = [
+    dot([name, os, agent?.osVersion]),
+    dot([model, agent?.hardwareArchitecture, agent?.cpu, mem]),
+    dot([serial ? `SN ${serial}` : "", localIp ? `Local IP ${localIp}` : "", pubIp ? `Public IP ${pubIp}` : ""]),
+    dot([lastUser ? `Last user ${lastUser}` : "", lastBoot ? `Last boot ${lastBoot}` : ""]),
+  ].filter(Boolean);
+  return lines.length ? `${heading("Device")}<br>${lines.join("<br>")}` : "";
+}
+
+/** Any remaining top-level fields Tier2 sent (beyond what we surface elsewhere). */
+function extraFieldLines(t: HaloTicket): string[] {
   const lines: string[] = [];
   for (const [k, v] of Object.entries(t)) {
     if (DUMP_SKIP.has(k) || v == null || v === "" || (Array.isArray(v) && v.length === 0)) continue;
     const rendered = typeof v === "object" ? JSON.stringify(v) : String(v);
-    lines.push(`${k}: ${truncate(rendered)}`);
+    lines.push(`${esc(k)}: ${esc(truncate(rendered))}`);
   }
-  return lines.length ? ["— All submitted fields —", ...lines].join("\n") : "";
+  return lines;
 }
 
-/** One-line hardware summary from the matched Gorelo agent (blank if no match). */
-function deviceSection(d: DeviceFullRow | null): string {
-  if (!d) return "";
-  const parts = [
-    d.display_name || d.hostname,
-    d.os,
-    d.serial ? `SN ${d.serial}` : "",
-    d.local_ip && d.local_ip.trim() ? `Local IP ${d.local_ip}` : "",
-    d.public_ip && d.public_ip.trim() ? `Public IP ${d.public_ip}` : "",
-  ].filter((s) => s && String(s).trim());
-  return parts.length ? `— Device —\n${parts.join(" · ")}` : "";
-}
-
-// The always-on HDB selections — every press includes them, so they carry no
-// signal. Strip them from the report; keep "Selections:" only when a non-default
-// item remains. (Both "as soon as available" and "...as soon as possible" wordings.)
-const DEFAULT_SELECTION_RES = [
-  /Connect directly to my computer as soon as (?:available|possible)/gi,
-  /This affects only me/gi,
-];
-
-function trimDefaultSelections(text: string): string {
-  let out = text;
-  for (const re of DEFAULT_SELECTION_RES) out = out.replace(re, "");
-  // Drop a now-empty "Selections:" label (it's the last field in the report).
-  out = out.replace(/Selections:\s*$/i, "");
-  return out.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+\n/g, "\n").trim();
-}
-
-/** Build the ticket body: the report + every submitted field + device details + routing. */
+/** Build the ticket description as HTML: report + extra fields + device + routing. */
 function buildHaloDescription(t: HaloTicket, routing: Routing): string {
   const raw = str(t.details_html) || str(t.details) || str(t.summary);
-  const body = truncate(trimDefaultSelections(htmlToText(raw)), BODY_MAX);
+  const sections: string[] = [];
 
-  // The report body already shows reporter/company/hostname, so keep the trail to
-  // just the routing outcome (which Gorelo ids we matched, and the asset status).
+  // Report Summary — one line per field; non-default selections as bullets.
+  const pairs = parseReportPairs(raw);
+  const rows = pairs
+    .filter((p) => p.label.toLowerCase() !== "selections")
+    .map((p) => `${esc(p.label)}: ${esc(truncate(p.value))}`);
+  const sels = chosenSelections(raw, pairs);
+  if (sels.length) {
+    rows.push(`Selections:<br>${sels.map((s) => `&nbsp;&bull; ${esc(s)}`).join("<br>")}`);
+  }
+  const report = rows.length
+    ? rows.join("<br>")
+    : esc(truncate(htmlToText(raw), BODY_MAX)).replace(/\n/g, "<br>");
+  sections.push(`${heading("Report Summary")}<br>${report}`);
+
+  // Any other submitted fields (rarely present after trimming the routing ids).
+  const extras = extraFieldLines(t);
+  if (extras.length) sections.push(`${heading("Other fields")}<br>${extras.join("<br>")}`);
+
+  // Device hardware (rich detail from the live Gorelo agent record).
+  const dev = deviceSection(routing.agentDetail, routing.device);
+  if (dev) sections.push(dev);
+
+  // Routing outcome.
   const assetStatus = routing.hostname
     ? routing.assetMatched
       ? `${routing.hostname} (linked)`
       : `${routing.hostname} (no Gorelo agent match)`
     : "none";
-  const trail = [
-    "— Helpdesk Buttons routing —",
-    `Client: ${routing.clientId}  Contact: ${routing.contactId ?? "none"}  ` +
-      `Location: ${routing.locationId ?? "none"}  Asset: ${assetStatus}`,
-  ].join("\n");
+  sections.push(
+    `${heading("Helpdesk Buttons routing")}<br>Client: ${routing.clientId} · ` +
+      `Contact: ${routing.contactId ?? "none"} · Location: ${routing.locationId ?? "none"} · ` +
+      `Asset: ${esc(assetStatus)}`,
+  );
 
-  return [body, dumpSubmittedFields(t), deviceSection(routing.device), trail]
-    .filter((s) => s.length > 0)
-    .join("\n\n");
+  return sections.join("<br><br>");
 }
 
 /**
@@ -743,8 +835,10 @@ async function handleActions(env: Env, body: string): Promise<Response> {
   const cmd = JSON.parse(pending.command) as CreatePublicTicketCommand;
   const links = extractNoteLinks(noteText);
   if (links.length) {
-    const rendered = links.map((l) => `${l.label}: ${l.href}`).join("\n");
-    cmd.description = `${cmd.description}\n\n— Helpdesk Buttons report —\n${rendered}`;
+    const rendered = links
+      .map((l) => `${esc(l.label)}: <a href="${esc(l.href)}">${esc(l.href)}</a>`)
+      .join("<br>");
+    cmd.description = `${cmd.description}<br><br><b>Helpdesk Buttons report</b><br>${rendered}`;
     console.log(`HALO action halo_id=${haloId}: attached ${links.length} report link(s)`);
   }
 

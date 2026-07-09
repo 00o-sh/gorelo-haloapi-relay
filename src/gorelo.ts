@@ -79,6 +79,20 @@ export class GoreloClient {
     return asArray<PublicDeviceResponse>(raw);
   }
 
+  /**
+   * GET /v1/assets/agents/{id} — the full agent record (rich hardware/OS detail).
+   * Best-effort: returns null on any failure so ticket creation never blocks on it.
+   */
+  async getAgent(id: string): Promise<PublicDeviceResponse | null> {
+    try {
+      const res = await this.request(`/v1/assets/agents/${encodeURIComponent(id)}`, { method: "GET" });
+      if (!res.ok) return null;
+      return (await res.json()) as PublicDeviceResponse;
+    } catch {
+      return null;
+    }
+  }
+
   /** GET /v1/clients — all clients + their domains (no query params). */
   async listClients(): Promise<PublicClientResponse[]> {
     const raw = await this.getJsonWithRetry<unknown>("/v1/clients");

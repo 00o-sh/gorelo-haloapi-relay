@@ -77,7 +77,22 @@ export interface PublicDeviceResponse {
   uuid?: string | null;
   localIPAddress?: string | null;
   publicIPAddress?: string | null;
+  lastLoggedOnUser?: string | null;
   lastLoggedOnUserUpn?: string | null;
+  lastBootUpTime?: string | null;
+  // Richer hardware/OS detail (present on GET /v1/assets/agents/{id}) — surfaced in
+  // the ticket so a tech sees the machine without clicking through.
+  os?: string | null;
+  osName?: string | null;
+  osVersion?: string | null;
+  osArchitecture?: string | null;
+  hardwareArchitecture?: string | null;
+  hardwareType?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  cpu?: string | null;
+  memory?: string | null;
+  disk?: string | null;
 }
 
 /** GET /v1/clients item. */
