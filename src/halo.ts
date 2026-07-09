@@ -992,6 +992,32 @@ async function postDeadLetter(
 }
 
 /**
+ * Send a test alert through the real dead-letter webhook path so its wiring can be
+ * verified on demand (via POST /admin/test-webhook), and report the HTTP result.
+ */
+export async function testDeadLetterWebhook(
+  env: Env,
+): Promise<{ configured: boolean; status?: number; error?: string }> {
+  if (!env.DEAD_LETTER_WEBHOOK) return { configured: false };
+  try {
+    const res = await fetch(env.DEAD_LETTER_WEBHOOK, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        text: "✅ Helpdesk Buttons → Gorelo relay: dead-letter webhook test. If you see this, alerts are wired up.",
+        event: "hdb_dead_letter_test",
+        halo_id: 0,
+        title: "Webhook connectivity test",
+        attempts: 0,
+      }),
+    });
+    return { configured: true, status: res.status };
+  } catch (e) {
+    return { configured: true, error: String(e) };
+  }
+}
+
+/**
  * Create any queued tickets whose /actions note never arrived (older than the
  * grace window). Runs from the cron and opportunistically off live requests.
  */

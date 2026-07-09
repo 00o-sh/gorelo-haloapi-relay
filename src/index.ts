@@ -1,6 +1,6 @@
 import { initSchema } from "./db.js";
 import { GoreloError } from "./gorelo.js";
-import { flushPendingTickets, handleHalo, isHaloRequest } from "./halo.js";
+import { flushPendingTickets, handleHalo, isHaloRequest, testDeadLetterWebhook } from "./halo.js";
 import { syncAll } from "./sync.js";
 import type { Env } from "./types.js";
 
@@ -28,6 +28,16 @@ export default {
         console.error("admin sync failed", describeError(err));
         return textResponse(502, "sync failed");
       }
+    }
+
+    // Admin: fire a test alert through the dead-letter webhook path (ADMIN_KEY).
+    if (request.method === "POST" && url.pathname === "/admin/test-webhook") {
+      if (!adminKeyOk(request, env)) return textResponse(401, "unauthorized");
+      const r = await testDeadLetterWebhook(env);
+      if (!r.configured) return textResponse(400, "DEAD_LETTER_WEBHOOK not set");
+      if (r.error) return textResponse(502, `webhook post failed: ${r.error}`);
+      const ok = r.status != null && r.status < 400;
+      return textResponse(ok ? 200 : 502, `webhook responded ${r.status}`);
     }
 
     // Lightweight health check (no secrets).

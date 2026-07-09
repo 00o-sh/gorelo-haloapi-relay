@@ -496,6 +496,27 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     expect(String(alert?.text)).toContain("dropped after 5");
   });
 
+  it("POST /admin/test-webhook fires a test alert and reports the webhook status", async () => {
+    let alert: Record<string, unknown> | undefined;
+    routes.push({
+      method: "POST",
+      match: (u) => u.host === "hooks.example.com",
+      handler: async (r) => {
+        alert = (await r.json()) as Record<string, unknown>;
+        return new Response("ok", { status: 200 });
+      },
+    });
+    const res = await req("/admin/test-webhook", { method: "POST", headers: { "X-Admin-Key": "test-admin-key" } });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("webhook responded 200");
+    expect(alert).toMatchObject({ event: "hdb_dead_letter_test" });
+  });
+
+  it("POST /admin/test-webhook requires the admin key", async () => {
+    const res = await req("/admin/test-webhook", { method: "POST" });
+    expect(res.status).toBe(401);
+  });
+
   it("re-queues with an incremented attempt when a create fails below the cap", async () => {
     routes.push({
       method: "POST",
