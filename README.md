@@ -62,7 +62,7 @@ wrangler d1 migrations apply tier2tickets-relay --local  # for `wrangler dev`
 
 # 3. Fill the Gorelo IDs in wrangler.toml [vars]
 GORELO_API_KEY=xxxx ./scripts/gorelo-ids.sh
-#   -> set DEFAULT_GROUP_ID, DEFAULT_TYPE_ID, DEFAULT_PRIORITY, DEFAULT_SOURCE, CATCHALL_CLIENT_ID
+#   -> set DEFAULT_GROUP_ID, DEFAULT_TYPE_ID, DEFAULT_STATUS_ID, DEFAULT_PRIORITY, DEFAULT_SOURCE, CATCHALL_CLIENT_ID
 
 # 4. Set secrets (never committed)
 wrangler secret put GORELO_API_KEY   # X-API-Key for Gorelo (ticket write + asset/contact/client read)
@@ -188,13 +188,17 @@ A snapshot of the live spec is captured at [`docs/gorelo-swagger.v1.json`](docs/
 
 Still to confirm against your tenant / portal:
 
-1. **Priority/source enum labels** (`wrangler.toml`) — the spec ships
-   `PublicTicketPriority=[0..4]` and `TicketSource=[1..6]` as **bare int enums with
-   no labels**, and there is **no list endpoint** for them (and no GET-ticket
-   endpoint to read a ticket back), so the API cannot reveal the mapping. Read the
-   labels off the priority/source dropdowns in the Gorelo ticket UI, then set
-   `DEFAULT_PRIORITY` / `DEFAULT_SOURCE`. Current values (`2` / `4`) are valid ints,
-   so tickets still create — they may just carry a non-ideal label until confirmed.
+1. **Priority label** (`wrangler.toml`) — the spec ships `PublicTicketPriority=[0..4]`
+   as a **bare int enum with no labels** and no list endpoint, so the API can't reveal
+   the mapping. Read the label off the priority dropdown in the Gorelo ticket UI and set
+   `DEFAULT_PRIORITY` (current `2` is a valid mid default). `DEFAULT_SOURCE` is set to `6`
+   (the API/integration source, confirmed accepted).
+
+**Required-fields note (learned from live testing):** despite the swagger marking it
+`nullable`, Gorelo's runtime validator **requires `statusId`** — a create without it
+returns HTTP 400. `DEFAULT_STATUS_ID` (default `1` = New) is always sent. `contactId` is
+**optional** (creates succeed without it), so it's resolved best-effort and left null when
+no client contact matches the requester email.
 
 Gorelo API base: `https://api.usw.gorelo.io` (US) / `https://api.aue.gorelo.io`
 (AU). Spec: `https://api.usw.gorelo.io/swagger/v1/swagger.json`. Auth header:

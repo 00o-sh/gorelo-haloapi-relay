@@ -50,6 +50,7 @@ export function buildTicketCommand(
     locationId: match.locationId,
     contactId,
     description,
+    statusId: Number(env.DEFAULT_STATUS_ID),
     groupId: Number(env.DEFAULT_GROUP_ID),
     typeId: Number(env.DEFAULT_TYPE_ID),
     priorityId: Number(env.DEFAULT_PRIORITY) as PublicTicketPriority,

@@ -11,6 +11,7 @@ export interface Env {
   ENFORCE_IP_ALLOWLIST: string; // "true" | "false"
   DEFAULT_GROUP_ID: string; // int as string
   DEFAULT_TYPE_ID: string; // int as string
+  DEFAULT_STATUS_ID: string; // int as string (REQUIRED by Gorelo's validator)
   DEFAULT_PRIORITY: string; // PublicTicketPriority int as string
   DEFAULT_SOURCE: string; // TicketSource int as string
   CATCHALL_CLIENT_ID: string; // int as string
@@ -41,6 +42,9 @@ export interface CreatePublicTicketCommand {
   locationId: number | null;
   contactId: number | null;
   description: string;
+  // statusId is `nullable` in the swagger, but Gorelo's runtime validator REQUIRES it
+  // (a create without statusId returns 400) — always send it.
+  statusId: number;
   groupId: number; // required (non-nullable)
   typeId: number; // required (non-nullable)
   priorityId: PublicTicketPriority; // required (non-nullable)

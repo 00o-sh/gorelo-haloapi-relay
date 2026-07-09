@@ -115,10 +115,11 @@ describe("ticket create handler", () => {
       clientId: 10,
       locationId: 100,
       contactId: 55,
+      statusId: 1,
       groupId: 7,
       typeId: 3,
       priorityId: 2,
-      sourceId: 4,
+      sourceId: 6,
       agentAssetIds: ["agent-abc"],
       sendTicketCreatedEmail: false,
     });
