@@ -577,10 +577,26 @@ function deviceSection(d: DeviceFullRow | null): string {
   return parts.length ? `— Device —\n${parts.join(" · ")}` : "";
 }
 
+// The always-on HDB selections — every press includes them, so they carry no
+// signal. Strip them from the report; keep "Selections:" only when a non-default
+// item remains. (Both "as soon as available" and "...as soon as possible" wordings.)
+const DEFAULT_SELECTION_RES = [
+  /Connect directly to my computer as soon as (?:available|possible)/gi,
+  /This affects only me/gi,
+];
+
+function trimDefaultSelections(text: string): string {
+  let out = text;
+  for (const re of DEFAULT_SELECTION_RES) out = out.replace(re, "");
+  // Drop a now-empty "Selections:" label (it's the last field in the report).
+  out = out.replace(/Selections:\s*$/i, "");
+  return out.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+\n/g, "\n").trim();
+}
+
 /** Build the ticket body: the report + every submitted field + device details + routing. */
 function buildHaloDescription(t: HaloTicket, routing: Routing): string {
   const raw = str(t.details_html) || str(t.details) || str(t.summary);
-  const body = truncate(htmlToText(raw), BODY_MAX);
+  const body = truncate(trimDefaultSelections(htmlToText(raw)), BODY_MAX);
 
   // The report body already shows reporter/company/hostname, so keep the trail to
   // just the routing outcome (which Gorelo ids we matched, and the asset status).
