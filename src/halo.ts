@@ -949,10 +949,52 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
   }
 }
 
+/** An alert to render into whatever format the target webhook expects. */
+interface WebhookAlert {
+  text: string;
+  facts: Array<[string, string]>;
+  body?: string; // long free-text block (e.g. the ticket description)
+  extra?: Record<string, unknown>; // structured fields for Slack/generic consumers
+}
+
+/** Slack (`{text}` + fields) vs Teams (Adaptive Card). Auto-detected, `WEBHOOK_KIND` overrides. */
+export function webhookKind(env: Env, url: string): "teams" | "slack" {
+  const k = (env.WEBHOOK_KIND ?? "").toLowerCase();
+  if (k === "teams" || k === "slack") return k;
+  return /webhook\.office\.com|logic\.azure\.com|office365/i.test(url) ? "teams" : "slack";
+}
+
+/** Serialize an alert for the given webhook kind. */
+export function webhookBody(kind: "teams" | "slack", a: WebhookAlert): string {
+  if (kind === "teams") {
+    const blocks: unknown[] = [{ type: "TextBlock", text: a.text, wrap: true, weight: "Bolder" }];
+    if (a.facts.length) {
+      blocks.push({ type: "FactSet", facts: a.facts.map(([title, value]) => ({ title, value })) });
+    }
+    if (a.body) blocks.push({ type: "TextBlock", text: a.body, wrap: true, isSubtle: true });
+    return JSON.stringify({
+      type: "message",
+      attachments: [
+        {
+          contentType: "application/vnd.microsoft.card.adaptive",
+          content: {
+            $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+            type: "AdaptiveCard",
+            version: "1.5",
+            body: blocks,
+          },
+        },
+      ],
+    });
+  }
+  // Slack + generic: `text` renders in Slack; the rest is machine-readable.
+  return JSON.stringify({ text: a.text, ...(a.extra ?? {}) });
+}
+
 /**
  * A dead-lettered ticket is a lost help request, so (optionally) alert a webhook
- * with enough detail for a human to recreate it. Slack-compatible (`text`) plus
- * structured fields for generic consumers. Best-effort — never throws.
+ * with enough detail for a human to recreate it. Renders Slack or Teams format.
+ * Best-effort — never throws.
  */
 async function postDeadLetter(
   env: Env,
@@ -966,25 +1008,35 @@ async function postDeadLetter(
   } catch {
     /* keep empty */
   }
-  const text =
-    `⚠️ Helpdesk Buttons ticket dropped after ${info.attempts} failed Gorelo creates — ` +
-    `client=${cmd.clientId ?? "?"} contact=${cmd.contactId ?? "none"} · “${cmd.title ?? "(no title)"}” · ${info.error}`;
+  const alert: WebhookAlert = {
+    text:
+      `⚠️ Helpdesk Buttons ticket dropped after ${info.attempts} failed Gorelo creates — ` +
+      `“${cmd.title ?? "(no title)"}”`,
+    facts: [
+      ["Client", String(cmd.clientId ?? "?")],
+      ["Contact", String(cmd.contactId ?? "none")],
+      ["Location", String(cmd.locationId ?? "none")],
+      ["Attempts", String(info.attempts)],
+      ["Error", info.error],
+    ],
+    body: cmd.description ?? undefined,
+    extra: {
+      event: "hdb_dead_letter",
+      halo_id: info.haloId,
+      client_id: cmd.clientId ?? null,
+      contact_id: cmd.contactId ?? null,
+      location_id: cmd.locationId ?? null,
+      title: cmd.title ?? null,
+      attempts: info.attempts,
+      error: info.error,
+      description: cmd.description ?? null, // full ticket body, so it can be recreated
+    },
+  };
   try {
     await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text,
-        event: "hdb_dead_letter",
-        halo_id: info.haloId,
-        client_id: cmd.clientId ?? null,
-        contact_id: cmd.contactId ?? null,
-        location_id: cmd.locationId ?? null,
-        title: cmd.title ?? null,
-        attempts: info.attempts,
-        error: info.error,
-        description: cmd.description ?? null, // full ticket body, so it can be recreated
-      }),
+      body: webhookBody(webhookKind(env, url), alert),
     });
   } catch (e) {
     console.error(`HALO dead-letter webhook failed halo_id=${info.haloId}: ${String(e)}`);
@@ -998,18 +1050,18 @@ async function postDeadLetter(
 export async function testDeadLetterWebhook(
   env: Env,
 ): Promise<{ configured: boolean; status?: number; error?: string }> {
-  if (!env.DEAD_LETTER_WEBHOOK) return { configured: false };
+  const url = env.DEAD_LETTER_WEBHOOK;
+  if (!url) return { configured: false };
+  const alert: WebhookAlert = {
+    text: "✅ Helpdesk Buttons → Gorelo relay: dead-letter webhook test. If you see this, alerts are wired up.",
+    facts: [["Event", "hdb_dead_letter_test"]],
+    extra: { event: "hdb_dead_letter_test", halo_id: 0, title: "Webhook connectivity test", attempts: 0 },
+  };
   try {
-    const res = await fetch(env.DEAD_LETTER_WEBHOOK, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text: "✅ Helpdesk Buttons → Gorelo relay: dead-letter webhook test. If you see this, alerts are wired up.",
-        event: "hdb_dead_letter_test",
-        halo_id: 0,
-        title: "Webhook connectivity test",
-        attempts: 0,
-      }),
+      body: webhookBody(webhookKind(env, url), alert),
     });
     return { configured: true, status: res.status };
   } catch (e) {

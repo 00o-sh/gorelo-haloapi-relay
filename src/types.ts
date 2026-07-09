@@ -18,6 +18,7 @@ export interface Env {
   HDB_TAG_ID?: string; // Gorelo tag id applied to every HDB ticket ("Submitted VIA HDB")
   EMERGENCY_PRIORITY?: string; // priority id for a press flagged "This is an emergency"
   DEBUG_LOGS?: string; // "true" enables verbose HALO CAPTURE/RESPONSE body logging (PII)
+  WEBHOOK_KIND?: string; // "teams" | "slack" — dead-letter alert format (auto-detected if unset)
 
   // secrets (wrangler secret put ...)
   GORELO_API_KEY: string; // X-API-Key sent to Gorelo

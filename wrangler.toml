@@ -69,6 +69,11 @@ EMERGENCY_PRIORITY = "1"
 # contain PII/PHI (names, emails, phones) — only for short debugging windows.
 DEBUG_LOGS = "false"
 
+# Dead-letter alert format: "teams" (Adaptive Card) or "slack" (text). Leave unset to
+# auto-detect from the DEAD_LETTER_WEBHOOK URL (Teams for *.webhook.office.com /
+# *.logic.azure.com, Slack/generic otherwise); set explicitly if auto-detect misses.
+# WEBHOOK_KIND = "teams"
+
 # --- Secrets (set via CLI, never committed) ---
 #   wrangler secret put GORELO_API_KEY      # X-API-Key for Gorelo (ticket write + asset/contact/client read scopes)
 #   wrangler secret put ADMIN_KEY           # gates POST /admin/sync (X-Admin-Key / X-API-Key / Authorization: Bearer)
