@@ -39,6 +39,10 @@ import type {
  */
 
 const HALO_UNREGISTERED_EMAIL = "unregistered@helpdeskbuttons.com";
+// Synthetic id for the unregistered catch-all user. Non-zero (Halo user ids are
+// positive) and high enough not to collide with a real Gorelo contact id; on
+// ticket create it resolves to no contact -> catch-all client.
+const HALO_UNREGISTERED_USER_ID = 999_999_999;
 
 // Tier2 sends this header on every Halo request — the most reliable discriminator.
 export const HALO_HEADER = "halo-app-name";
@@ -173,17 +177,32 @@ function searchTerm(url: URL): string {
   return "";
 }
 
-async function haloUserFromContact(db: D1Database, c: ContactRow): Promise<Record<string, unknown>> {
-  const clientName = c.client_id != null ? await getClientName(db, c.client_id) : null;
+function splitName(name: string, email: string): { first: string; last: string } {
+  const n = (name || email.split("@")[0] || "").trim();
+  const parts = n.split(/\s+/);
+  return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
+}
+
+/** Map a Gorelo contact to a Halo user object (fuller shape for Tier2's parser). */
+async function haloUserFromContact(
+  db: D1Database,
+  c: { id: number; email: string; name: string; client_id: number; site_id: number },
+): Promise<Record<string, unknown>> {
+  const clientName = (await getClientName(db, c.client_id)) ?? "";
+  const { first, last } = splitName(c.name, c.email);
   return {
     id: c.id,
     name: c.name || c.email,
+    firstname: first,
+    surname: last,
     emailaddress: c.email,
     email: c.email,
-    client_id: c.client_id ?? 0,
-    client_name: clientName ?? "",
-    site_id: c.location_id ?? 0,
+    client_id: c.client_id,
+    client_name: clientName,
+    site_id: c.site_id,
+    site_name: "",
     inactive: false,
+    isserviceaccount: false,
     use: "user",
   };
 }
@@ -194,26 +213,30 @@ async function handleUsers(env: Env, url: URL): Promise<Response> {
 
   // The catch-all "unregistered" user Tier2 falls back to for unknown submitters.
   if (email === HALO_UNREGISTERED_EMAIL) {
-    return jsonResponse(200, {
-      users: [
-        {
-          id: 0,
-          name: "Unregistered",
-          emailaddress: HALO_UNREGISTERED_EMAIL,
-          email: HALO_UNREGISTERED_EMAIL,
-          client_id: Number(env.CATCHALL_CLIENT_ID),
-          site_id: 0,
-          inactive: false,
-        },
-      ],
-      record_count: 1,
+    const user = await haloUserFromContact(env.DB, {
+      id: HALO_UNREGISTERED_USER_ID,
+      email: HALO_UNREGISTERED_EMAIL,
+      name: "Unregistered",
+      client_id: Number(env.CATCHALL_CLIENT_ID),
+      site_id: 0,
     });
+    return jsonResponse(200, { users: [user], record_count: 1 });
   }
 
   const rows = email.includes("@")
     ? [await findContactByEmail(env.DB, email)].filter((r): r is ContactRow => r != null)
     : await searchContactRows(env.DB, term);
-  const users = await Promise.all(rows.map((r) => haloUserFromContact(env.DB, r)));
+  const users = await Promise.all(
+    rows.map((r) =>
+      haloUserFromContact(env.DB, {
+        id: r.id,
+        email: r.email ?? "",
+        name: r.name ?? "",
+        client_id: r.client_id ?? 0,
+        site_id: r.location_id ?? 0,
+      }),
+    ),
+  );
   return jsonResponse(200, { users, record_count: users.length });
 }
 
@@ -236,13 +259,20 @@ async function handleSite(env: Env, url: URL): Promise<Response> {
 }
 
 async function handleAsset(env: Env, url: URL): Promise<Response> {
-  const rows = await searchDeviceRows(env.DB, searchTerm(url));
+  const clientIdParam = url.searchParams.get("client_id");
+  const clientId = clientIdParam ? Number(clientIdParam) : undefined;
+  const rows = await searchDeviceRows(
+    env.DB,
+    searchTerm(url),
+    Number.isFinite(clientId) ? clientId : undefined,
+  );
   const assets = rows.map((d) => ({
     id: d.asset_num ?? 0,
     inventory_number: d.hostname ?? d.display_name ?? "",
     key_field: d.hostname ?? d.display_name ?? "",
     client_id: d.client_id ?? 0,
     site_id: d.location_id ?? 0,
+    inactive: false,
   }));
   return jsonResponse(200, { assets, record_count: assets.length });
 }
@@ -465,14 +495,25 @@ export async function handleHalo(request: Request, env: Env): Promise<Response> 
   // Always return decodable JSON: Tier2's Halo client fails hard ("could not
   // decode json from the response") on any non-JSON body, so no error may escape
   // as an HTML/text 500.
+  let res: Response;
   try {
     if (haloResource(url.pathname) === "token") {
-      return await handleToken(request, env, url, body);
+      res = await handleToken(request, env, url, body);
+    } else {
+      await ensureSynced(env);
+      res = await handleApi(request, env, url, body);
     }
-    await ensureSynced(env);
-    return await handleApi(request, env, url, body);
   } catch (err) {
     console.error(`HALO handler error ${request.method} ${url.pathname}:`, String(err));
-    return jsonResponse(500, { error: "internal_error", detail: String(err).slice(0, 300) });
+    res = jsonResponse(500, { error: "internal_error", detail: String(err).slice(0, 300) });
   }
+
+  // Log the response body we send back (debug phase — see exactly what Tier2 gets).
+  try {
+    const out = await res.clone().text();
+    console.log(`HALO RESPONSE ${res.status} ${request.method} ${url.pathname} -> ${out.slice(0, 1500)}`);
+  } catch {
+    /* ignore */
+  }
+  return res;
 }

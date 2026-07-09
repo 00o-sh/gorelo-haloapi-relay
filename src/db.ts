@@ -235,17 +235,24 @@ export async function getContactById(db: D1Database, id: number): Promise<Contac
     .first<ContactRow>();
 }
 
-/** Devices by hostname/display-name/serial substring (for the Halo asset search). */
-export async function searchDeviceRows(db: D1Database, search: string, limit = 25): Promise<DeviceFullRow[]> {
+/** Devices by hostname/display-name/serial substring (for the Halo asset search),
+ *  optionally scoped to a client (Halo passes client_id on the asset lookup). */
+export async function searchDeviceRows(
+  db: D1Database,
+  search: string,
+  clientId?: number,
+  limit = 25,
+): Promise<DeviceFullRow[]> {
   const s = like(search);
-  const { results } = await db
-    .prepare(
-      `SELECT hostname, agent_id, asset_num, client_id, location_id, display_name, serial, local_ip, public_ip, os
-       FROM devices WHERE lower(hostname) LIKE ? OR lower(display_name) LIKE ? OR lower(serial) LIKE ?
-       ORDER BY hostname LIMIT ?`,
-    )
-    .bind(s, s, s, limit)
-    .all<DeviceFullRow>();
+  const cols = `hostname, agent_id, asset_num, client_id, location_id, display_name, serial, local_ip, public_ip, os`;
+  const match = `(lower(hostname) LIKE ? OR lower(display_name) LIKE ? OR lower(serial) LIKE ?)`;
+  const stmt =
+    clientId != null
+      ? db
+          .prepare(`SELECT ${cols} FROM devices WHERE ${match} AND client_id = ? ORDER BY hostname LIMIT ?`)
+          .bind(s, s, s, clientId, limit)
+      : db.prepare(`SELECT ${cols} FROM devices WHERE ${match} ORDER BY hostname LIMIT ?`).bind(s, s, s, limit);
+  const { results } = await stmt.all<DeviceFullRow>();
   return results ?? [];
 }
 

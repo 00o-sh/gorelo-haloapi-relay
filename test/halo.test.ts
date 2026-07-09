@@ -128,7 +128,7 @@ describe("Halo routing to real Tier2 paths (no /api prefix)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
     const j = (await res.json()) as { users: Array<Record<string, unknown>> };
-    expect(j.users[0]).toMatchObject({ id: 0, client_id: 999 });
+    expect(j.users[0]).toMatchObject({ id: 999999999, client_id: 999 });
   });
 });
 
@@ -154,7 +154,7 @@ describe("Halo lookups (Gorelo-backed)", () => {
   it("GET /api/Users maps the unregistered catch-all user", async () => {
     const res = await req(`/api/Users?search=unregistered@helpdeskbuttons.com`);
     const j = (await res.json()) as { users: Array<Record<string, unknown>> };
-    expect(j.users[0]).toMatchObject({ id: 0, client_id: 999 });
+    expect(j.users[0]).toMatchObject({ id: 999999999, client_id: 999 });
   });
 
   it("GET /api/Site filters by client_id", async () => {
