@@ -1,7 +1,7 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import worker from "../src/index.js";
-import { isHaloPath } from "../src/halo.js";
+import { haloResource, isHaloPath } from "../src/halo.js";
 import { initSchema } from "../src/db.js";
 import { assetNum } from "../src/sync.js";
 
@@ -71,12 +71,21 @@ async function req(path: string, init?: RequestInit): Promise<Response> {
   return res;
 }
 
-describe("isHaloPath", () => {
-  it("matches token + resource paths, not admin/health", () => {
+describe("isHaloPath / haloResource", () => {
+  it("matches the real Tier2 paths (no /api prefix) and the /api form", () => {
+    // Tier2 actually calls these (from the capture): /token, /users, ...
+    expect(isHaloPath("/token")).toBe(true);
+    expect(isHaloPath("/users")).toBe(true);
+    expect(isHaloPath("/tickets")).toBe(true);
+    expect(isHaloPath("/api/Users")).toBe(true);
     expect(isHaloPath("/auth/token")).toBe(true);
-    expect(isHaloPath("/api/Tickets")).toBe(true);
     expect(isHaloPath("/health")).toBe(false);
     expect(isHaloPath("/admin/sync")).toBe(false);
+  });
+  it("normalizes to a resource name", () => {
+    expect(haloResource("/users")).toBe("users");
+    expect(haloResource("/api/Users/123")).toBe("users");
+    expect(haloResource("/token")).toBe("token");
   });
 });
 
@@ -92,8 +101,8 @@ describe("Halo OAuth token", () => {
     }).toString(),
   });
 
-  it("issues a bearer token for valid client credentials", async () => {
-    const res = await req("/auth/token", token("halo-test-secret"));
+  it("issues a bearer token at the real Tier2 path POST /token?tenant=", async () => {
+    const res = await req("/token?tenant=salient-x", token("halo-test-secret"));
     expect(res.status).toBe(200);
     const j = (await res.json()) as Record<string, unknown>;
     expect((j.access_token as string).length).toBeGreaterThan(0);
@@ -101,8 +110,25 @@ describe("Halo OAuth token", () => {
   });
 
   it("rejects a wrong client secret", async () => {
-    const res = await req("/auth/token", token("nope"));
+    const res = await req("/token", token("nope"));
     expect(res.status).toBe(401);
+  });
+});
+
+describe("Halo routing to real Tier2 paths (no /api prefix)", () => {
+  it("GET /users (lowercase, halo-app-name header) resolves a contact", async () => {
+    const res = await req("/users?search=user@corp.com", { headers: { "halo-app-name": "tier2tech" } });
+    expect(res.status).toBe(200);
+    const j = (await res.json()) as { users: Array<Record<string, unknown>> };
+    expect(j.users[0]).toMatchObject({ id: 55, client_id: 10 });
+  });
+
+  it("GET /users for the unregistered catch-all returns JSON (never 404/text)", async () => {
+    const res = await req("/users?search=unregistered@helpdeskbuttons.com");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const j = (await res.json()) as { users: Array<Record<string, unknown>> };
+    expect(j.users[0]).toMatchObject({ id: 0, client_id: 999 });
   });
 });
 

@@ -40,8 +40,55 @@ import type {
 
 const HALO_UNREGISTERED_EMAIL = "unregistered@helpdeskbuttons.com";
 
+// Tier2 sends this header on every Halo request — the most reliable discriminator.
+export const HALO_HEADER = "halo-app-name";
+
+// Known Halo resource names (singular + plural). Tier2 calls these WITHOUT the
+// standard `/api/` prefix and lowercased (e.g. `GET /users`, `POST /tickets`),
+// so we route on the normalized resource name rather than the exact path.
+const HALO_RESOURCES = new Set([
+  "token",
+  "users",
+  "client",
+  "clients",
+  "site",
+  "sites",
+  "asset",
+  "assets",
+  "ticket",
+  "tickets",
+  "action",
+  "actions",
+  "tickettype",
+  "tickettypes",
+  "status",
+  "statuses",
+  "team",
+  "teams",
+  "priority",
+  "priorities",
+  "agent",
+  "agents",
+]);
+
+/** Last non-numeric path segment, lowercased: `/api/Users/123` -> `users`, `/token` -> `token`. */
+export function haloResource(pathname: string): string {
+  const segs = pathname
+    .split("/")
+    .filter(Boolean)
+    .map((s) => s.toLowerCase());
+  while (segs.length && /^\d+$/.test(segs[segs.length - 1]!)) segs.pop();
+  return segs.length ? segs[segs.length - 1]! : "";
+}
+
+/** Fallback path matcher (primary routing is the halo-app-name header). */
 export function isHaloPath(pathname: string): boolean {
-  return pathname === "/auth/token" || pathname === "/token" || pathname.startsWith("/api/");
+  return pathname === "/auth/token" || HALO_RESOURCES.has(haloResource(pathname));
+}
+
+/** True if this request is a Halo call (header first, then path shape). */
+export function isHaloRequest(request: Request, pathname: string): boolean {
+  return request.headers.get(HALO_HEADER) != null || isHaloPath(pathname);
 }
 
 const jsonResponse = (status: number, body: unknown): Response =>
@@ -201,22 +248,27 @@ async function handleAsset(env: Env, url: URL): Promise<Response> {
 }
 
 /** Minimal config lists so Tier2 can resolve default ids. Refine from captures. */
-function handleConfig(env: Env, path: string): Response {
-  switch (path) {
-    case "/api/TicketType":
+function handleConfig(env: Env, resource: string): Response {
+  switch (resource) {
+    case "tickettype":
+    case "tickettypes":
       return jsonResponse(200, [{ id: Number(env.DEFAULT_TYPE_ID), name: "Incident" }]);
-    case "/api/Status":
+    case "status":
+    case "statuses":
       return jsonResponse(200, [{ id: Number(env.DEFAULT_STATUS_ID), name: "New" }]);
-    case "/api/Team":
+    case "team":
+    case "teams":
       return jsonResponse(200, [{ id: Number(env.DEFAULT_GROUP_ID), name: "Everyone" }]);
-    case "/api/Priority":
+    case "priority":
+    case "priorities":
       return jsonResponse(200, [
         { id: 1, name: "Critical" },
         { id: 2, name: "High" },
         { id: 3, name: "Medium" },
         { id: 4, name: "Low" },
       ]);
-    case "/api/Agent":
+    case "agent":
+    case "agents":
       return jsonResponse(200, { agents: [], record_count: 0 });
     default:
       return jsonResponse(200, []);
@@ -370,24 +422,24 @@ async function handleCreateTicket(env: Env, body: string): Promise<Response> {
 // --- Router -----------------------------------------------------------------
 
 async function handleApi(request: Request, env: Env, url: URL, body: string): Promise<Response> {
-  const path = url.pathname;
+  const resource = haloResource(url.pathname);
   const method = request.method;
 
-  if (path === "/api/Tickets" || path === "/api/tickets") {
+  if (resource === "ticket" || resource === "tickets") {
     if (method === "POST") return handleCreateTicket(env, body);
     return jsonResponse(200, { tickets: [], record_count: 0 });
   }
-  if (path === "/api/Actions" || path === "/api/actions") {
+  if (resource === "action" || resource === "actions") {
     // Gorelo's public API has no ticket-note endpoint, so accept + log only.
     console.log("HALO action (note/attachment) accepted — no Gorelo note endpoint");
     return jsonResponse(201, [{ id: Date.now() % 1_000_000_000 }]);
   }
   if (method === "GET") {
-    if (path === "/api/Users") return handleUsers(env, url);
-    if (path === "/api/Client") return handleClient(env, url);
-    if (path === "/api/Site") return handleSite(env, url);
-    if (path === "/api/Asset") return handleAsset(env, url);
-    return handleConfig(env, path);
+    if (resource === "users") return handleUsers(env, url);
+    if (resource === "client" || resource === "clients") return handleClient(env, url);
+    if (resource === "site" || resource === "sites") return handleSite(env, url);
+    if (resource === "asset" || resource === "assets") return handleAsset(env, url);
+    return handleConfig(env, resource);
   }
   return jsonResponse(200, []);
 }
@@ -414,7 +466,7 @@ export async function handleHalo(request: Request, env: Env): Promise<Response> 
   // decode json from the response") on any non-JSON body, so no error may escape
   // as an HTML/text 500.
   try {
-    if (url.pathname === "/auth/token" || url.pathname === "/token") {
+    if (haloResource(url.pathname) === "token") {
       return await handleToken(request, env, url, body);
     }
     await ensureSynced(env);

@@ -1,6 +1,6 @@
 import { getLastSync, initSchema } from "./db.js";
 import { extractTicketNumber, GoreloClient, GoreloError } from "./gorelo.js";
-import { handleHalo, isHaloPath } from "./halo.js";
+import { handleHalo, isHaloRequest } from "./halo.js";
 import { matchClient } from "./matcher.js";
 import { buildIdentity, normalizeEmail, parseHdbTag, parseInbound, stripHdbTag } from "./parse.js";
 import { syncAll } from "./sync.js";
@@ -61,9 +61,10 @@ export default {
       return textResponse(200, "ok");
     }
 
-    // HaloPSA/ITSM mock (OAuth token + resource server). Routed by path so it
-    // coexists with the osTicket path on the same Worker. See src/halo.ts.
-    if (isHaloPath(url.pathname)) {
+    // HaloPSA/ITSM mock (OAuth token + resource server). Detected by the
+    // `halo-app-name` header Tier2 sends (and a path fallback), so it coexists
+    // with the osTicket path on the same Worker. See src/halo.ts.
+    if (isHaloRequest(request, url.pathname)) {
       return handleHalo(request, env);
     }
 
