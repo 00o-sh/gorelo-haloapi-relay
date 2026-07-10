@@ -8,10 +8,12 @@ interface GoreloData {
   agents: Record<string, unknown>[];
   clients: Record<string, unknown>[];
   locations: Record<number, Record<string, unknown>[]>;
+  // Keyed by client id for readability; the bulk /v1/contacts stub flattens them.
   contacts: Record<number, Record<string, unknown>[]>;
-  // Client ids whose /v1/contacts fetch should fail (400 = non-retryable) to
-  // simulate a partial sync.
-  failContacts: Set<number>;
+  // When true, the bulk /v1/contacts fetch fails (400) — simulates a partial sync.
+  failAllContacts: boolean;
+  // Client ids whose /v1/clients/{id}/locations fetch should fail (400).
+  failLocations: Set<number>;
 }
 let data: GoreloData;
 let realFetch: typeof fetch;
@@ -33,11 +35,15 @@ function installFetch(): void {
     if (p === "/v1/assets/agents") return json(data.agents);
     if (p === "/v1/clients") return json(data.clients);
     const loc = p.match(/^\/v1\/clients\/(\d+)\/locations$/);
-    if (loc) return json(data.locations[Number(loc[1])] ?? []);
+    if (loc) {
+      const cid = Number(loc[1]);
+      if (data.failLocations.has(cid)) return new Response("bad request", { status: 400 });
+      return json(data.locations[cid] ?? []);
+    }
     if (p === "/v1/contacts") {
-      const cid = Number(url.searchParams.get("clientid"));
-      if (data.failContacts.has(cid)) return new Response("bad request", { status: 400 });
-      return json(data.contacts[cid] ?? []);
+      // Bulk fetch (no clientid): return every contact flattened.
+      if (data.failAllContacts) return new Response("bad request", { status: 400 });
+      return json(Object.values(data.contacts).flat());
     }
     throw new Error(`unmocked fetch: ${p}`);
   }) as typeof fetch;
@@ -62,7 +68,8 @@ function baseData(): GoreloData {
         publicIPAddress: "",
       },
     ],
-    failContacts: new Set<number>(),
+    failAllContacts: false,
+    failLocations: new Set<number>(),
   };
 }
 
@@ -172,8 +179,7 @@ describe("syncAll delta reconcile", () => {
     expect(gone?.n).toBe(0);
   });
 
-  it("does NOT delete contacts when a per-client fetch fails (partial sync)", async () => {
-    // Two clients, each with a contact; both mirror cleanly first.
+  it("does NOT delete contacts when the bulk contacts fetch fails (partial sync)", async () => {
     data.clients.push({ id: 20, name: "NewCo" });
     data.locations[20] = [{ id: 200, name: "Branch" }];
     data.contacts[20] = [
@@ -182,35 +188,42 @@ describe("syncAll delta reconcile", () => {
     await syncAll(env);
     expect(await count("contacts")).toBe(2);
 
-    // Next sync: client 20's contacts fetch fails. Its contact (77) must survive.
-    data.failContacts.add(20);
+    // Next sync: the bulk /v1/contacts call fails. Both contacts must survive.
+    data.failAllContacts = true;
     const r = await syncAll(env);
     expect(r.complete).toBe(false);
-    expect(r.deleted).toBe(0); // nothing deleted despite 77 being "missing" this run
-    expect(await count("contacts")).toBe(2); // both still present
-    const bob = await env.DB.prepare(`SELECT id FROM contacts WHERE id = 77`).first();
-    expect(bob).not.toBeNull();
+    expect(r.deleted).toBe(0); // no contact deletes despite the fetch returning nothing
+    expect(await count("contacts")).toBe(2);
   });
 
-  it("keeps a contact returned under two clients stable (no flip-flop churn)", async () => {
-    // Contact 55 shows up in BOTH clients' contact lists with a null clientId,
-    // so the fallback (?? cid) would otherwise store a different client each run
-    // depending on fetch order. Dedupe must pin one deterministic winner.
+  it("does NOT delete locations when a per-client locations fetch fails", async () => {
     data.clients.push({ id: 20, name: "NewCo" });
     data.locations[20] = [{ id: 200, name: "Branch" }];
-    const shared = { id: 55, primaryEmail: "user@corp.com", firstName: "Jane", lastName: "Doe", clientId: null, clientLocationId: null };
-    data.contacts[10] = [shared];
-    data.contacts[20] = [shared];
+    await syncAll(env);
+    expect(await count("locations")).toBe(2);
+
+    data.failLocations.add(20);
+    const r = await syncAll(env);
+    expect(r.complete).toBe(false);
+    expect(await count("locations")).toBe(2); // client 20's site survives the failed fetch
+  });
+
+  it("collapses a duplicate contact id in the bulk feed to one stable row", async () => {
+    // The bulk feed contains id 55 twice with differing data (e.g. a merge
+    // artifact). Dedupe must pin one deterministic winner, stable across runs.
+    data.contacts[10] = [
+      { id: 55, primaryEmail: "a@corp.com", firstName: "Jane", lastName: "A", clientId: 10, clientLocationId: 100 },
+      { id: 55, primaryEmail: "b@corp.com", firstName: "Jane", lastName: "B", clientId: 20, clientLocationId: 200 },
+    ];
 
     await syncAll(env);
     expect(await count("contacts")).toBe(1); // collapsed to one row
-    const first = await env.DB.prepare(`SELECT client_id FROM contacts WHERE id = 55`).first<{ client_id: number }>();
+    const first = await env.DB.prepare(`SELECT email FROM contacts WHERE id = 55`).first<{ email: string }>();
 
-    // Repeated syncs must not rewrite it — the winner is stable.
     const r2 = await syncAll(env);
-    expect(r2.changed).toBe(0);
-    const second = await env.DB.prepare(`SELECT client_id FROM contacts WHERE id = 55`).first<{ client_id: number }>();
-    expect(second?.client_id).toBe(first?.client_id);
+    expect(r2.changed).toBe(0); // stable winner — no rewrite
+    const second = await env.DB.prepare(`SELECT email FROM contacts WHERE id = 55`).first<{ email: string }>();
+    expect(second?.email).toBe(first?.email);
   });
 
   it("applies a field change to an existing row in place (same agent_id)", async () => {

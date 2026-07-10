@@ -3,7 +3,10 @@ import { GoreloClient } from "./gorelo.js";
 import { normalizeHost } from "./parse.js";
 import type { Env, PublicContactResponse, PublicDeviceResponse } from "./types.js";
 
-const INSERT_CHUNK = 100; // stay within D1's per-batch statement limits
+// D1 caps a batch's total bound parameters (~variable limit); the widest row
+// (devices, 10 cols) at 200/batch stays well under it. Larger chunks mean fewer
+// batches = fewer subrequests per sync — the fleet writes fit the invocation cap.
+const INSERT_CHUNK = 200;
 // Per-client Gorelo calls in flight at once. Kept low: at 5, the fleet's
 // per-client location/contact fetches tripped Gorelo's rate limit hard enough
 // that some fetches failed every sync (partial runs that never reconcile). The
@@ -63,7 +66,7 @@ interface ContactInsert {
   id: number;
   email: string;
   name: string;
-  clientId: number;
+  clientId: number | null;
   locationId: number | null;
 }
 
@@ -125,48 +128,50 @@ export async function syncAll(env: Env): Promise<SyncStats> {
   await initSchema(env.DB);
   const client = new GoreloClient(env);
 
-  const [agents, clients] = await Promise.all([client.listAgents(), client.listClients()]);
+  // Contacts come from ONE bulk call (each row carries its own clientId), not one
+  // per client — that alone removes N-1 subrequests, the main reason a large-fleet
+  // sync blew past the Worker's per-invocation subrequest cap. Locations have no
+  // bulk endpoint, so they stay per-client (bounded concurrency).
+  //
+  // Any fetch here can fail; if one does, the fetched set is INCOMPLETE and must
+  // NOT be treated as authoritative — otherwise the reconcile step would delete
+  // rows we merely failed to fetch, then re-insert them next run (write thrash +
+  // a window of missing lookups). Track completeness and gate deletes on it below.
+  const [agents, clients, allContacts] = await Promise.all([
+    client.listAgents(),
+    client.listClients(),
+    client.listAllContacts().catch((err) => {
+      console.error(`sync: listAllContacts failed — skipping contact deletes: ${String(err)}`);
+      return null;
+    }),
+  ]);
   const clientIds = clients.map((c) => c.id);
 
-  // Per-client locations + contacts (bounded concurrency). A per-client fetch can
-  // fail (e.g. Gorelo rate-limits under load); if any does, the fetched set is
-  // INCOMPLETE and must NOT be treated as authoritative — otherwise the reconcile
-  // step would delete every row whose client we simply failed to fetch, then
-  // re-insert it next run (write thrash + a window of missing lookups). Track
-  // completeness and gate deletes on it below.
-  const locationRows: LocationInsert[] = [];
+  const contactsComplete = allContacts !== null;
   const contactRows: ContactInsert[] = [];
+  for (const ct of allContacts ?? []) {
+    const email = (ct.primaryEmail ?? "").trim().toLowerCase();
+    if (!email) continue;
+    contactRows.push({
+      id: ct.id,
+      email,
+      name: contactName(ct),
+      clientId: ct.clientId ?? null,
+      locationId: ct.clientLocationId ?? null,
+    });
+  }
+
+  const locationRows: LocationInsert[] = [];
   let locationsComplete = true;
-  let contactsComplete = true;
   await mapLimit(clientIds, FETCH_CONCURRENCY, async (cid) => {
-    const [locations, contacts] = await Promise.all([
-      client.listLocations(cid).catch((err) => {
-        locationsComplete = false;
-        console.error(`sync: listLocations(${cid}) failed — skipping location deletes: ${String(err)}`);
-        return null;
-      }),
-      client.listContacts(cid).catch((err) => {
-        contactsComplete = false;
-        console.error(`sync: listContacts(${cid}) failed — skipping contact deletes: ${String(err)}`);
-        return null;
-      }),
-    ]);
+    const locations = await client.listLocations(cid).catch((err) => {
+      locationsComplete = false;
+      console.error(`sync: listLocations(${cid}) failed — skipping location deletes: ${String(err)}`);
+      return null;
+    });
     if (locations) {
       for (const l of locations) {
         locationRows.push({ id: l.id, name: (l.name ?? "").trim(), clientId: cid });
-      }
-    }
-    if (contacts) {
-      for (const ct of contacts) {
-        const email = (ct.primaryEmail ?? "").trim().toLowerCase();
-        if (!email) continue;
-        contactRows.push({
-          id: ct.id,
-          email,
-          name: contactName(ct),
-          clientId: ct.clientId ?? cid,
-          locationId: ct.clientLocationId ?? null,
-        });
       }
     }
   });

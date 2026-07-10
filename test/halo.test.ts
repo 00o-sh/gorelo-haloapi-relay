@@ -524,11 +524,16 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
   });
 
   it("POST /admin/sync alerts via notifly when the sync fails", async () => {
-    // Gorelo fleet fetch is down -> syncAll rejects. Clients resolves so the
-    // Promise.all has a single (handled) rejection, no unhandled-rejection noise.
+    // Gorelo fleet fetch is down -> syncAll rejects. Clients + contacts resolve so
+    // the Promise.all has a single (handled) rejection, no unhandled-rejection noise.
     routes.push({
       method: "GET",
       match: (u) => u.pathname === "/v1/clients",
+      handler: () => json(200, []),
+    });
+    routes.push({
+      method: "GET",
+      match: (u) => u.pathname === "/v1/contacts",
       handler: () => json(200, []),
     });
     // 400 is non-retryable, so getJsonWithRetry throws immediately (no backoff).

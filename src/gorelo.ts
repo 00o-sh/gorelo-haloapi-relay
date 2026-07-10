@@ -67,7 +67,7 @@ export class GoreloClient {
    * GET with retry/backoff on 429/5xx (used by the off-request-path sync).
    * Never logs the request headers (they carry the API key).
    */
-  private async getJsonWithRetry<T>(path: string, maxAttempts = 6): Promise<T> {
+  private async getJsonWithRetry<T>(path: string, maxAttempts = 4): Promise<T> {
     let attempt = 0;
     let lastStatus = 0;
     let lastBody = "";
@@ -120,13 +120,13 @@ export class GoreloClient {
   }
 
   /**
-   * GET /v1/contacts?clientid={id} — contacts for one client (resolved live).
-   * The API filter is clientid only; caller matches primaryEmail client-side.
+   * GET /v1/contacts — ALL contacts in one call (the `clientid` filter is
+   * optional; each row carries its own clientId/clientLocationId). The sync uses
+   * this instead of one call per client, collapsing N per-client fetches into a
+   * single subrequest to stay under the Worker's per-invocation subrequest cap.
    */
-  async listContacts(clientId: number): Promise<PublicContactResponse[]> {
-    const raw = await this.getJsonWithRetry<unknown>(
-      `/v1/contacts?clientid=${encodeURIComponent(String(clientId))}`,
-    );
+  async listAllContacts(): Promise<PublicContactResponse[]> {
+    const raw = await this.getJsonWithRetry<unknown>("/v1/contacts");
     return asArray<PublicContactResponse>(raw);
   }
 

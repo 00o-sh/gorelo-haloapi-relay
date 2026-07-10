@@ -1,7 +1,21 @@
 /** D1 schema management and point lookups for the Gorelo mirror. */
 
+// Bump when the CREATE/migration block below changes. Stamped in sync_meta once
+// applied so later syncs skip the whole idempotent block — it costs ~14
+// subrequests every run otherwise, and syncAll runs under the Worker's
+// per-invocation subrequest cap.
+const SCHEMA_VERSION = "2";
+
 /** Create the mirror tables + indexes if they don't exist (idempotent). */
 export async function initSchema(db: D1Database): Promise<void> {
+  // Fast path: already migrated to the current version -> a single read, done.
+  // On a fresh DB sync_meta doesn't exist yet, so the read throws -> full init.
+  const applied = await db
+    .prepare(`SELECT value FROM sync_meta WHERE key = 'schema_version' LIMIT 1`)
+    .first<{ value: string }>()
+    .catch(() => null);
+  if (applied?.value === SCHEMA_VERSION) return;
+
   await db.batch([
     // Agents/devices — enriched for the Halo asset lookup + ticket enrichment.
     db.prepare(
@@ -130,6 +144,15 @@ export async function initSchema(db: D1Database): Promise<void> {
       // already dropped / column absent / build doesn't support DROP COLUMN — fine
     }
   }
+
+  // Stamp the version so subsequent syncs take the fast path above.
+  await db
+    .prepare(
+      `INSERT INTO sync_meta (key, value) VALUES ('schema_version', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    )
+    .bind(SCHEMA_VERSION)
+    .run();
 }
 
 // --- Halo mock lookups ------------------------------------------------------

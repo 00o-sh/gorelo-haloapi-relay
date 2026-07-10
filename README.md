@@ -214,22 +214,30 @@ Gorelo's agent/client lists have no server-side filters, so they're mirrored int
 - **Manual** `POST /admin/sync` (gated by `ADMIN_KEY`) for post-onboarding refresh.
 - **Lazy bootstrap** — on the first Halo call ever (no `last_sync` row), `syncAll()`
   runs once inline so a fresh deploy self-heals.
-- `syncAll()` mirrors clients, locations (per-client), contacts (per-client,
-  bounded concurrency) and the agent fleet (rich device rows with `asset_num`),
-  with retry/backoff on Gorelo `429`/`5xx` — **honoring `Retry-After`** and
-  running per-client fetches at low concurrency so the sweep doesn't trip
-  Gorelo's rate limit (which caused partial runs). It **delta-reconciles** each table
+- `syncAll()` mirrors clients, **all contacts (one bulk `GET /v1/contacts`)**,
+  locations (per-client — no bulk endpoint) and the agent fleet (rich device rows
+  with `asset_num`), with retry/backoff on Gorelo `429`/`5xx` — **honoring
+  `Retry-After`** and running per-client fetches at low concurrency. It
+  **delta-reconciles** each table
   rather than rewriting it: every fetched row is upserted with an `ON CONFLICT …
   DO UPDATE … WHERE <columns differ>` guard (so unchanged rows write nothing),
   then only rows that vanished upstream are deleted. D1 writes per sync scale with
   actual churn, not fleet size — a no-change sync costs ~0 writes, which keeps the
   6-hourly refresh cheap even for large tenants. (Devices upsert on a unique
   `agent_id` index; the other tables on their integer primary key.)
-- **Partial-fetch safety** — if a per-client locations/contacts fetch fails, the
-  fetched set is incomplete, so that table is **upsert-only that run (no deletes)**
-  — rows we merely failed to fetch are never dropped; a later complete sync
-  reconciles them. Rows are also deduped by key with a deterministic winner so a
-  contact returned under multiple clients doesn't flip-flop each run.
+- **Subrequest budget** — a Worker invocation has a hard subrequest cap (50 on
+  the free plan, 1000 on paid), and every Gorelo `fetch` + D1 query counts. The
+  sync is kept lean to fit it on the free plan: contacts in one bulk call rather
+  than one per client; the idempotent schema migrations are gated behind a
+  `schema_version` row in `sync_meta` so they run once, not every sync (steady
+  state is a single version-check read); and D1 writes go out in larger batches.
+  Locations still cost one call per client (no bulk endpoint), so that's the
+  factor that grows the budget as clients are added.
+- **Partial-fetch safety** — if the bulk contacts or a per-client locations fetch
+  fails, the fetched set is incomplete, so that table is **upsert-only that run
+  (no deletes)** — rows we merely failed to fetch are never dropped; a later
+  complete sync reconciles them. Rows are also deduped by key with a deterministic
+  winner so a duplicate id in the feed doesn't flip-flop the row each run.
 - **Observability** — `syncAll()` returns `changed` (rows actually written this
   run), `deleted` (rows removed as stale) and `complete` (all fetches succeeded)
   alongside the mirrored totals. All are logged by the cron; the `POST /admin/sync`
