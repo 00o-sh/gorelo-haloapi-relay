@@ -136,8 +136,10 @@ detail (client/contact/title/description) so a tech can recreate the lost press.
 one or more comma/space-separated URLs; verify wiring anytime with
 `POST /admin/test-webhook`. For a **Teams Workflows** (Power Automate) webhook, use
 the `workflows://` scheme — take the generated URL and swap `https` → `workflows`
-(the `sig` token is preserved). notifly drops the message `type`, so severity rides
-in the title/body.
+(the `sig` token is preserved). The notifly
+[Playground URL builder](https://notifly.sh/docs/builder/playground/) will do this
+conversion for you (it runs entirely client-side — the URL/`sig` never leaves your
+browser). notifly drops the message `type`, so severity rides in the title/body.
 
 **Reporter routing:** Tier2 files every press under the hardcoded
 `unregistered@helpdeskbuttons.com` user → the catch-all client, so the real identity
@@ -168,13 +170,20 @@ nothing real to display and the Worker hands it a placeholder to correlate the n
 Gorelo has indicated an API update exposing the created ticket number is expected
 within ~a month; once available, the Worker can return the real number instead of the
 surrogate. The Gorelo-side ticket itself is created correctly — only the number echoed
-back to the end user is a placeholder.
+back to the end user is a placeholder. Tracked in
+[#35](https://github.com/salientmsp/tier2tickets-relay/issues/35) (fix pending the
+Gorelo API update).
 
 **Requester email:** Gorelo's "ticket created" email is suppressed by default
 (`sendTicketCreatedEmail=false`). Set `SEND_TICKET_CREATED_EMAIL=true` to enable it —
 but the Worker still only asks for it when it **resolved a real client contact**
 (`contactId`). A press that falls back to the catch-all client (no contact match)
 never sends the email, so it can't notify the wrong party.
+
+> **Known Gorelo bug:** even with the flag set, Gorelo currently **ignores**
+> `sendTicketCreatedEmail` and sends no email (reproduced in Gorelo's own Swagger UI).
+> The relay sends the flag correctly; the fix is upstream. Tracked in
+> [#34](https://github.com/salientmsp/tier2tickets-relay/issues/34).
 
 **ID mapping:** Halo `client_id`/`site_id`/`user_id` *are* the Gorelo client / location
 / contact ids (the lookups return them). Assets use a deterministic numeric surrogate
