@@ -312,6 +312,25 @@ Gorelo's agent/client lists have no server-side filters, so they're mirrored int
 > Not addressed here (require design decisions, tracked separately): request
 > **rate limiting** (F7) and **routing/contact-trust** hardening (F5).
 
+To report a vulnerability, and for the security scope and posture, see
+[`SECURITY.md`](SECURITY.md).
+
+## Disclaimer & AI-assisted development
+
+- **AI-assisted:** parts of this repository — including some of the security
+  remediations above — were written with the help of an AI coding tool. The AI
+  **does not claim authorship of or credit for the pre-existing code** it
+  modified; that remains the work of the human authors / copyright holder. Its
+  contribution is limited to the specific changes in the commits/PRs where it was
+  used.
+- **Review before you rely on it:** these changes fixed concrete issues we had and
+  **work for our deployment**, but AI-generated code is not independently proven
+  correct. If you adopt, fork, or deploy this, **review and test it yourself** —
+  "works for us" is not a guarantee it is correct or safe for your use case.
+- **No warranty / no liability:** provided under the [MIT License](LICENSE),
+  **"AS IS", without warranty of any kind** and with no liability for damages
+  arising from its use. See [`SECURITY.md`](SECURITY.md) for the full statement.
+
 ## Tests
 
 ```bash
