@@ -19,10 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          # Build against Node 26 (floor is 24 if 26 ever needs backing off).
-          # check-latest pulls the freshest 26.x instead of the runner's cached one.
           node-version: 26
-          check-latest: true
           cache: npm
 
       - name: Install dependencies
