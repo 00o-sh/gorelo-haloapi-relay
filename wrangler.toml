@@ -64,6 +64,12 @@ HDB_TAG_ID = "31974"
 # Unset to always use DEFAULT_PRIORITY.
 EMERGENCY_PRIORITY = "1"
 
+# Ask Gorelo to send its "ticket created" email to the requester. "false" (default)
+# never sends it. "true" sends it ONLY when the Worker resolved a real client contact
+# — a press that falls back to the catch-all client (no contact match) never triggers
+# the email, so it can't notify the wrong party.
+SEND_TICKET_CREATED_EMAIL = "true"
+
 # Verbose logging toggle. "false" (default) logs only non-PII breadcrumbs (method/path/
 # status + resolved ids). Set "true" to log full HALO CAPTURE/RESPONSE bodies — which
 # contain PII/PHI (names, emails, phones) — only for short debugging windows.

@@ -613,6 +613,45 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     expect(cap.posted()).toMatchObject({ clientId: 999, contactId: null, agentAssetIds: [] });
   });
 
+  it("sends the ticket-created email only on a matched contact when SEND_TICKET_CREATED_EMAIL=true", async () => {
+    const prev = (env as { SEND_TICKET_CREATED_EMAIL?: string }).SEND_TICKET_CREATED_EMAIL;
+    (env as { SEND_TICKET_CREATED_EMAIL?: string }).SEND_TICKET_CREATED_EMAIL = "true";
+    try {
+      // Matched contact (user@corp.com -> id 55): email is requested.
+      const hit = captureGoreloCreate();
+      const c1 = await req("/tickets", {
+        method: "POST",
+        headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+        body: JSON.stringify([{ summary: "help", details_html: reportHtml({ email: "user@corp.com" }) }]),
+      });
+      const id1 = ((await c1.json()) as { id: number }).id;
+      await req("/actions", {
+        method: "POST",
+        headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+        body: JSON.stringify([{ ticket_id: id1, note_html: "note" }]),
+      });
+      expect(hit.posted()).toMatchObject({ contactId: 55, sendTicketCreatedEmail: true });
+
+      // No contact match (catch-all fallback): email stays suppressed even with the flag on.
+      routes = []; // drop the first capture so this create hits the new route
+      const miss = captureGoreloCreate("00000000-0000-0000-0000-000000000000");
+      const c2 = await req("/tickets", {
+        method: "POST",
+        headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+        body: JSON.stringify([{ summary: "help", details_html: reportHtml({ email: "stranger@nowhere.test" }) }]),
+      });
+      const id2 = ((await c2.json()) as { id: number }).id;
+      await req("/actions", {
+        method: "POST",
+        headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+        body: JSON.stringify([{ ticket_id: id2, note_html: "x" }]),
+      });
+      expect(miss.posted()).toMatchObject({ contactId: null, sendTicketCreatedEmail: false });
+    } finally {
+      (env as { SEND_TICKET_CREATED_EMAIL?: string }).SEND_TICKET_CREATED_EMAIL = prev;
+    }
+  });
+
   it("orphan-flush creates a queued ticket whose note never arrived", async () => {
     const cap = captureGoreloCreate("11111111-1111-1111-1111-111111111111");
     // Insert a pending row that is already past the grace window.

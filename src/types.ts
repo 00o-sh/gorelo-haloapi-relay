@@ -17,6 +17,10 @@ export interface Env {
   CATCHALL_CLIENT_ID: string; // int as string
   HDB_TAG_ID?: string; // Gorelo tag id applied to every HDB ticket ("Submitted VIA HDB")
   EMERGENCY_PRIORITY?: string; // priority id for a press flagged "This is an emergency"
+  // "true" asks Gorelo to send its "ticket created" email — but ONLY when the Worker
+  // resolved a real client contact (contactId), so the mail never fires on the
+  // catch-all/no-contact fallback. Any other value (or unset) suppresses it.
+  SEND_TICKET_CREATED_EMAIL?: string;
   DEBUG_LOGS?: string; // "true" enables verbose HALO CAPTURE/RESPONSE body logging (PII)
 
   // secrets (wrangler secret put ...)

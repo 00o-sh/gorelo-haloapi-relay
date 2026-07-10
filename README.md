@@ -156,6 +156,12 @@ Report** link (screenshots/diagnostics). The routing outcome is logged, not show
 **Priority:** a press flagged "This is an emergency" is created at `EMERGENCY_PRIORITY`
 (else `DEFAULT_PRIORITY`).
 
+**Requester email:** Gorelo's "ticket created" email is suppressed by default
+(`sendTicketCreatedEmail=false`). Set `SEND_TICKET_CREATED_EMAIL=true` to enable it —
+but the Worker still only asks for it when it **resolved a real client contact**
+(`contactId`). A press that falls back to the catch-all client (no contact match)
+never sends the email, so it can't notify the wrong party.
+
 **ID mapping:** Halo `client_id`/`site_id`/`user_id` *are* the Gorelo client / location
 / contact ids (the lookups return them). Assets use a deterministic numeric surrogate
 of the agent UUID (`asset_num`, stored in D1), mapped back on create.
@@ -237,3 +243,16 @@ A snapshot of the live spec is captured at [`docs/gorelo-swagger.v1.json`](docs/
 Gorelo API base: `https://api.usw.gorelo.io` (US) / `https://api.aue.gorelo.io`
 (AU). Spec: `https://api.usw.gorelo.io/swagger/v1/swagger.json`. Auth header:
 `X-API-Key`. Keys are scoped — a key lacking a scope returns `403`.
+
+## Configuration note
+
+The `[vars]` in `wrangler.toml` (Gorelo group/type/status/client ids, the
+catch-all client, tag ids) are populated for one specific Gorelo tenant. They are
+tenant configuration, not secrets — but if you deploy your own instance, re-run
+`scripts/gorelo-ids.sh` and replace them (and the `database_id`) with your own.
+All actual secrets (`GORELO_API_KEY`, `ADMIN_KEY`, `NOTIFLY_URLS`, the optional
+Halo OAuth pair) are set via `wrangler secret put` and are never committed.
+
+## License
+
+Released under the [MIT License](LICENSE).

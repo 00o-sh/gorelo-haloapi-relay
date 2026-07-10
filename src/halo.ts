@@ -823,7 +823,10 @@ function buildTicketCommand(env: Env, t: HaloTicket, routing: Routing): CreatePu
     sourceId: Number(env.DEFAULT_SOURCE) as TicketSource,
     tagIds: tagId ? [tagId] : undefined,
     agentAssetIds: routing.agentAssetIds,
-    sendTicketCreatedEmail: false,
+    // Only let Gorelo email the requester when SEND_TICKET_CREATED_EMAIL is on AND we
+    // matched a real contact — otherwise the ticket lands on the catch-all client with
+    // no (or the wrong) contact, and an auto-email would notify nobody useful.
+    sendTicketCreatedEmail: env.SEND_TICKET_CREATED_EMAIL === "true" && routing.contactId != null,
   };
 }
 
