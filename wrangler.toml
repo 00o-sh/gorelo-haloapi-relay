@@ -73,7 +73,7 @@ SEND_TICKET_CREATED_EMAIL = "true"
 # Verbose logging toggle. "false" (default) logs only non-PII breadcrumbs (method/path/
 # status + resolved ids). Set "true" to log full HALO CAPTURE/RESPONSE bodies — which
 # contain PII/PHI (names, emails, phones) — only for short debugging windows.
-DEBUG_LOGS = "true"
+DEBUG_LOGS = "false"
 
 # --- Secrets (set via CLI, never committed) ---
 #   wrangler secret put GORELO_API_KEY      # X-API-Key for Gorelo (ticket write + asset/contact/client read scopes)
