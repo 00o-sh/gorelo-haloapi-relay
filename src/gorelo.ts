@@ -21,6 +21,27 @@ export class GoreloError extends Error {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+const MAX_RETRY_WAIT_MS = 15_000; // cap any single backoff so a sync can't hang
+
+/**
+ * How long to wait before retrying a transient (429/5xx) response. Honors the
+ * server's `Retry-After` (delta-seconds or HTTP-date) when present — the fixed
+ * exponential schedule was often shorter than Gorelo's actual rate-limit window,
+ * so attempts exhausted and the fetch failed. Falls back to exponential backoff
+ * with jitter to avoid a thundering herd of retries realigning under load.
+ */
+export function retryDelayMs(res: Response, attempt: number): number {
+  const ra = res.headers.get("retry-after");
+  if (ra) {
+    const secs = Number(ra);
+    if (Number.isFinite(secs)) return Math.min(Math.max(secs, 0) * 1000, MAX_RETRY_WAIT_MS);
+    const when = Date.parse(ra); // HTTP-date form
+    if (!Number.isNaN(when)) return Math.min(Math.max(when - Date.now(), 0), MAX_RETRY_WAIT_MS);
+  }
+  const base = Math.min(500 * 2 ** (attempt - 1), 8_000); // 0.5,1,2,4,8s (capped)
+  return base + Math.floor(Math.random() * 250); // jitter
+}
+
 /** Thin, dependency-free Gorelo API client. Keeps the API key out of logs. */
 export class GoreloClient {
   private readonly baseUrl: string;
@@ -46,7 +67,7 @@ export class GoreloClient {
    * GET with retry/backoff on 429/5xx (used by the off-request-path sync).
    * Never logs the request headers (they carry the API key).
    */
-  private async getJsonWithRetry<T>(path: string, maxAttempts = 4): Promise<T> {
+  private async getJsonWithRetry<T>(path: string, maxAttempts = 6): Promise<T> {
     let attempt = 0;
     let lastStatus = 0;
     let lastBody = "";
@@ -59,8 +80,7 @@ export class GoreloClient {
       if (res.status === 429 || res.status >= 500) {
         attempt += 1;
         if (attempt < maxAttempts) {
-          const backoff = 500 * 2 ** (attempt - 1); // 0.5s, 1s, 2s
-          await sleep(backoff);
+          await sleep(retryDelayMs(res, attempt));
           continue;
         }
       }

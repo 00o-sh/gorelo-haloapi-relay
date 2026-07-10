@@ -216,17 +216,25 @@ Gorelo's agent/client lists have no server-side filters, so they're mirrored int
   runs once inline so a fresh deploy self-heals.
 - `syncAll()` mirrors clients, locations (per-client), contacts (per-client,
   bounded concurrency) and the agent fleet (rich device rows with `asset_num`),
-  with retry/backoff on Gorelo `429`/`5xx`. It **delta-reconciles** each table
+  with retry/backoff on Gorelo `429`/`5xx` — **honoring `Retry-After`** and
+  running per-client fetches at low concurrency so the sweep doesn't trip
+  Gorelo's rate limit (which caused partial runs). It **delta-reconciles** each table
   rather than rewriting it: every fetched row is upserted with an `ON CONFLICT …
   DO UPDATE … WHERE <columns differ>` guard (so unchanged rows write nothing),
   then only rows that vanished upstream are deleted. D1 writes per sync scale with
   actual churn, not fleet size — a no-change sync costs ~0 writes, which keeps the
   6-hourly refresh cheap even for large tenants. (Devices upsert on a unique
   `agent_id` index; the other tables on their integer primary key.)
+- **Partial-fetch safety** — if a per-client locations/contacts fetch fails, the
+  fetched set is incomplete, so that table is **upsert-only that run (no deletes)**
+  — rows we merely failed to fetch are never dropped; a later complete sync
+  reconciles them. Rows are also deduped by key with a deterministic winner so a
+  contact returned under multiple clients doesn't flip-flop each run.
 - **Observability** — `syncAll()` returns `changed` (rows actually written this
-  run) and `deleted` (rows removed as stale) alongside the mirrored totals. Both
-  are logged by the cron and echoed in the `POST /admin/sync` response, so a
-  steady state reads `changed=0 deleted=0`.
+  run), `deleted` (rows removed as stale) and `complete` (all fetches succeeded)
+  alongside the mirrored totals. All are logged by the cron; the `POST /admin/sync`
+  response echoes the counts and appends `(partial: …)` when a fetch failed. A
+  steady state reads `changed=0 deleted=0 complete=true`.
 - **Failure alerts** — if a sync throws (cron, `POST /admin/sync`, or the lazy
   bootstrap), it fires the configured notifly webhook(s) (`NOTIFLY_URLS`, the same
   path as dead-letter alerts) so a stale mirror doesn't degrade silently. No-op

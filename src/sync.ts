@@ -4,7 +4,12 @@ import { normalizeHost } from "./parse.js";
 import type { Env, PublicContactResponse, PublicDeviceResponse } from "./types.js";
 
 const INSERT_CHUNK = 100; // stay within D1's per-batch statement limits
-const FETCH_CONCURRENCY = 5; // per-client Gorelo calls in flight at once
+// Per-client Gorelo calls in flight at once. Kept low: at 5, the fleet's
+// per-client location/contact fetches tripped Gorelo's rate limit hard enough
+// that some fetches failed every sync (partial runs that never reconcile). The
+// client also honors Retry-After now, so a gentle-but-reliable sweep beats a
+// fast one that gets throttled.
+const FETCH_CONCURRENCY = 2;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
