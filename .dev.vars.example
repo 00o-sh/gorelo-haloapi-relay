@@ -10,7 +10,9 @@ ADMIN_KEY="another-long-random-secret"
 # Optional: notifly (Apprise-style) URL(s) alerted when a queued ticket is
 # dead-lettered (dropped after MAX_PENDING_ATTEMPTS failed Gorelo creates). One or
 # more, comma/space separated. Leave unset to only log the drop.
-# e.g. ntfy://alerts  |  msteams://group@tenant/channel/webhook  |  slack://a/b/c/%23chan
+# e.g. ntfy://alerts  |  slack://a/b/c/%23chan  |  Teams Workflows: take the Power
+# Automate webhook URL and swap https -> workflows:
+#   workflows://<env>.environment.api.powerplatform.com/powerautomate/.../invoke?...&sig=...
 # NOTIFLY_URLS="ntfy://my-hdb-alerts"
 
 # Optional: Halo mock OAuth credentials. If both are set, the /token endpoint

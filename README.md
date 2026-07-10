@@ -134,7 +134,10 @@ after `PENDING_GRACE_MS`. A command that keeps failing to create is **dead-lette
 (Apprise-style URLs — ntfy / Teams / Slack / Discord / email / …) with the ticket
 detail (client/contact/title/description) so a tech can recreate the lost press. Set
 one or more comma/space-separated URLs; verify wiring anytime with
-`POST /admin/test-webhook`.
+`POST /admin/test-webhook`. For a **Teams Workflows** (Power Automate) webhook, use
+the `workflows://` scheme — take the generated URL and swap `https` → `workflows`
+(the `sig` token is preserved). notifly drops the message `type`, so severity rides
+in the title/body.
 
 **Reporter routing:** Tier2 files every press under the hardcoded
 `unregistered@helpdeskbuttons.com` user → the catch-all client, so the real identity

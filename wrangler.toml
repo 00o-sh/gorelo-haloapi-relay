@@ -73,7 +73,7 @@ DEBUG_LOGS = "false"
 #   wrangler secret put GORELO_API_KEY      # X-API-Key for Gorelo (ticket write + asset/contact/client read scopes)
 #   wrangler secret put ADMIN_KEY           # gates POST /admin/sync (X-Admin-Key / X-API-Key / Authorization: Bearer)
 #   wrangler secret put NOTIFLY_URLS        # optional: notifly (Apprise) URL(s) alerted when a ticket is dead-lettered
-#                                           #   e.g. "ntfy://alerts" or "msteams://…" — comma/space separated for several
+#                                           #   e.g. "ntfy://alerts" | Teams Workflows "workflows://…&sig=…" — comma/space separated
 #   wrangler secret put HALO_CLIENT_ID   # optional: Halo mock OAuth client_id  (validated if both are set)
 #   wrangler secret put HALO_CLIENT_SECRET # optional: Halo mock OAuth client_secret
 
