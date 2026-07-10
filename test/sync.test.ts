@@ -86,7 +86,8 @@ beforeEach(async () => {
 describe("syncAll delta reconcile", () => {
   it("upserts the full dataset on a first (empty-mirror) sync", async () => {
     const r = await syncAll(env);
-    expect(r).toEqual({ clients: 1, locations: 1, contacts: 1, devices: 1 });
+    // Every table starts empty, so all four rows are written and none deleted.
+    expect(r).toEqual({ clients: 1, locations: 1, contacts: 1, devices: 1, changed: 4, deleted: 0 });
     expect(await count("clients")).toBe(1);
     expect(await count("locations")).toBe(1);
     expect(await count("contacts")).toBe(1);
@@ -98,6 +99,15 @@ describe("syncAll delta reconcile", () => {
       .first<{ hostname: string; asset_num: number }>();
     expect(dev?.hostname).toBe("pc-01"); // normalizeHost lowercases
     expect(dev?.asset_num).toBe(assetNum(String(data.agents[0]!.id)));
+  });
+
+  it("reports zero changes when nothing changed upstream (no wasted writes)", async () => {
+    await syncAll(env);
+    const r = await syncAll(env); // identical dataset, second run
+    expect(r.changed).toBe(0);
+    expect(r.deleted).toBe(0);
+    // Row counts unchanged.
+    expect(r).toMatchObject({ clients: 1, locations: 1, contacts: 1, devices: 1 });
   });
 
   it("is idempotent: a second identical sync changes no rows and keeps the data", async () => {
@@ -135,6 +145,9 @@ describe("syncAll delta reconcile", () => {
 
     const r = await syncAll(env);
     expect(r.devices).toBe(2);
+    // 2 new devices + 1 new client + 1 new location written; old device deleted.
+    expect(r.changed).toBeGreaterThanOrEqual(4);
+    expect(r.deleted).toBe(1); // the vanished device
     expect(await count("devices")).toBe(2);
     expect(await count("clients")).toBe(2);
 
@@ -151,7 +164,9 @@ describe("syncAll delta reconcile", () => {
     // Same device id, new hostname + serial.
     data.agents[0]!.displayName = "PC-RENAMED";
     data.agents[0]!.serialNo = "SN2";
-    await syncAll(env);
+    const r = await syncAll(env);
+    expect(r.changed).toBe(1); // exactly the one device row updated in place
+    expect(r.deleted).toBe(0);
 
     expect(await count("devices")).toBe(1); // still one row, updated not duplicated
     const dev = await env.DB

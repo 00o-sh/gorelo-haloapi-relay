@@ -223,6 +223,14 @@ Gorelo's agent/client lists have no server-side filters, so they're mirrored int
   actual churn, not fleet size — a no-change sync costs ~0 writes, which keeps the
   6-hourly refresh cheap even for large tenants. (Devices upsert on a unique
   `agent_id` index; the other tables on their integer primary key.)
+- **Observability** — `syncAll()` returns `changed` (rows actually written this
+  run) and `deleted` (rows removed as stale) alongside the mirrored totals. Both
+  are logged by the cron and echoed in the `POST /admin/sync` response, so a
+  steady state reads `changed=0 deleted=0`.
+- **Failure alerts** — if a sync throws (cron, `POST /admin/sync`, or the lazy
+  bootstrap), it fires the configured notifly webhook(s) (`NOTIFLY_URLS`, the same
+  path as dead-letter alerts) so a stale mirror doesn't degrade silently. No-op
+  when `NOTIFLY_URLS` is unset.
 
 ## Security
 
