@@ -156,6 +156,20 @@ Report** link (screenshots/diagnostics). The routing outcome is logged, not show
 **Priority:** a press flagged "This is an emergency" is created at `EMERGENCY_PRIORITY`
 (else `DEFAULT_PRIORITY`).
 
+**Known limitation — the ticket number shown to the user is not the Gorelo ticket
+number.** The "ticket number" on the HDB "Help Data Delivered" confirmation screen is
+a synthetic id the Worker mints and returns on `POST /tickets` (the `haloId` in
+`src/halo.ts` — a surrogate of a random UUID). It is **not** the ticket number Gorelo
+assigns. This is unavoidable today: the create is deferred (the real Gorelo ticket
+isn't created until the `/actions` note arrives), and even on create Gorelo's `POST
+/v1/tickets` returns only `{ "ticketId": "<uuid>" }` — no human-readable ticket number,
+and there is no GET-ticket / list-tickets endpoint to read one back. So Tier2 has
+nothing real to display and the Worker hands it a placeholder to correlate the note.
+Gorelo has indicated an API update exposing the created ticket number is expected
+within ~a month; once available, the Worker can return the real number instead of the
+surrogate. The Gorelo-side ticket itself is created correctly — only the number echoed
+back to the end user is a placeholder.
+
 **Requester email:** Gorelo's "ticket created" email is suppressed by default
 (`sendTicketCreatedEmail=false`). Set `SEND_TICKET_CREATED_EMAIL=true` to enable it —
 but the Worker still only asks for it when it **resolved a real client contact**
