@@ -15,11 +15,14 @@ jobs:
     name: typecheck & test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          # Always build against the newest active LTS; check-latest pulls the
+          # freshest matching release instead of the runner's cached one.
+          node-version: lts/*
+          check-latest: true
           cache: npm
 
       - name: Install dependencies
