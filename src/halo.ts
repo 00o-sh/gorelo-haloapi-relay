@@ -845,7 +845,8 @@ async function handleCreateTicket(env: Env, ctx: ExecutionContext | undefined, b
   const haloId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
   await putPendingTicket(env.DB, haloId, JSON.stringify(cmd), nowIso());
   console.log(
-    `HALO queued ticket halo_id=${haloId} client=${routing.clientId} contact=${routing.contactId} assets=${routing.agentAssetIds.length}`,
+    `HALO queued ticket halo_id=${haloId} client=${routing.clientId} contact=${routing.contactId} assets=${routing.agentAssetIds.length}` +
+      (debugOn(env) ? ` email=${cmd.sendTicketCreatedEmail}` : ""),
   );
 
   // Opportunistically flush older orphans in the background (no-op when empty).
@@ -930,7 +931,9 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
     const raw = await new GoreloClient(env).createTicket(cmd);
     const uuid = extractTicketNumber(raw) ?? "";
     console.log(
-      `HALO created gorelo ticket ${uuid} from action (halo_id=${haloId} client=${cmd.clientId} contact=${cmd.contactId})`,
+      `HALO created gorelo ticket ${uuid} from action (halo_id=${haloId} client=${cmd.clientId} contact=${cmd.contactId}` +
+        (debugOn(env) ? ` email=${cmd.sendTicketCreatedEmail}` : "") +
+        `)`,
     );
     return jsonResponse(201, [{ id: actionId, ticket_id: haloId, gorelo_ticket_id: uuid }]);
   } catch (err) {
@@ -1034,7 +1037,11 @@ export async function flushPendingTickets(env: Env): Promise<number> {
       const raw = await client.createTicket(cmd);
       const uuid = extractTicketNumber(raw) ?? "";
       created++;
-      console.log(`HALO orphan-flush created gorelo ticket ${uuid} (halo_id=${row.halo_id})`);
+      console.log(
+        `HALO orphan-flush created gorelo ticket ${uuid} (halo_id=${row.halo_id}` +
+          (debugOn(env) ? ` contact=${cmd.contactId} email=${cmd.sendTicketCreatedEmail}` : "") +
+          `)`,
+      );
     } catch (err) {
       const attempts = row.attempts + 1;
       if (attempts >= MAX_PENDING_ATTEMPTS) {
