@@ -1,6 +1,7 @@
 import { getLastSync, getSyncMeta, initSchema, mirrorCounts, setSyncMeta } from "./db.js";
-import { GoreloClient, GoreloError } from "./gorelo.js";
+import { GoreloClient } from "./gorelo.js";
 import { flushPendingTickets, handleHalo, isHaloRequest, postSyncFailure, testNotifly } from "./halo.js";
+import { breadcrumb, describeError } from "./log.js";
 import { reconcileClientLocations, syncAll } from "./sync.js";
 import type { Env, SyncLocationsMessage } from "./types.js";
 
@@ -46,8 +47,9 @@ export default {
             `${r.complete ? "" : " (partial: bulk contacts fetch failed, contact deletes skipped)"}`,
         );
       } catch (err) {
-        console.error("admin sync failed", describeError(err));
-        ctx.waitUntil(postSyncFailure(env, { source: "admin", error: describeError(err) }));
+        const detail = describeError(err);
+        breadcrumb(`admin sync failed ${detail}`);
+        ctx.waitUntil(postSyncFailure(env, { source: "admin", error: detail }));
         return textResponse(502, "sync failed");
       }
     }
@@ -123,7 +125,7 @@ export default {
       ctx.waitUntil(
         syncAll(env)
           .then((r) =>
-            console.log(
+            breadcrumb(
               `cron sync ok clients=${r.clients} locations=${r.locations} contacts=${r.contacts} ` +
                 `devices=${r.devices} changed=${r.changed} deleted=${r.deleted} ` +
                 `locations_queued=${r.locationsQueued} complete=${r.complete}`,
@@ -131,7 +133,7 @@ export default {
           )
           .catch(async (err) => {
             const detail = describeError(err);
-            console.error("cron sync failed", detail);
+            breadcrumb(`cron sync failed ${detail}`);
             await postSyncFailure(env, { source: "cron", error: detail });
           }),
       );
@@ -141,9 +143,9 @@ export default {
       initSchema(env.DB)
         .then(() => flushPendingTickets(env))
         .then((n) => {
-          if (n > 0) console.log(`cron flush created ${n} orphaned ticket(s)`);
+          if (n > 0) breadcrumb(`cron flush created ${n} orphaned ticket(s)`);
         })
-        .catch((err) => console.error("cron flush failed", describeError(err))),
+        .catch((err) => breadcrumb(`cron flush failed ${describeError(err)}`)),
     );
   },
 
@@ -160,13 +162,13 @@ export default {
         const locations = await client.listLocations(clientId);
         const { changed, deleted } = await reconcileClientLocations(env.DB, clientId, locations);
         if (changed || deleted) {
-          console.log(`queue locations client=${clientId} changed=${changed} deleted=${deleted}`);
+          breadcrumb(`queue locations client=${clientId} changed=${changed} deleted=${deleted}`);
         }
         msg.ack();
       } catch (err) {
         // Transient (Gorelo rate-limit / 5xx) — let the queue redeliver with
         // backoff up to max_retries, then drop. Never delete on failure.
-        console.error(`queue locations client=${clientId} failed, will retry: ${describeError(err)}`);
+        breadcrumb(`queue locations client=${clientId} failed, will retry: ${describeError(err)}`);
         msg.retry();
       }
     }
@@ -185,12 +187,19 @@ function adminKeyOk(request: Request, env: Env): boolean {
   const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
   const provided =
     request.headers.get("X-Admin-Key") ?? request.headers.get("X-API-Key") ?? bearer;
-  return provided === env.ADMIN_KEY;
+  return constantTimeEqual(provided, env.ADMIN_KEY);
 }
 
-/** Describe an error WITHOUT leaking secrets. */
-function describeError(err: unknown): string {
-  if (err instanceof GoreloError) return `GoreloError status=${err.status}`;
-  if (err instanceof Error) return `${err.name}: ${err.message}`;
-  return String(err);
+/**
+ * Length-checked constant-time string compare (audit F6): once the lengths match,
+ * the XOR-accumulate over the encoded bytes takes the same time regardless of
+ * where the first difference is, so it can't be used as a timing oracle.
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  const ea = new TextEncoder().encode(a);
+  const eb = new TextEncoder().encode(b);
+  if (ea.length !== eb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ea.length; i++) diff |= ea[i]! ^ eb[i]!;
+  return diff === 0;
 }

@@ -73,7 +73,8 @@ wrangler queues create tier2tickets-sync
 # 3. Fill the Gorelo IDs in wrangler.toml [vars]
 GORELO_API_KEY=xxxx ./scripts/gorelo-ids.sh
 #   -> set DEFAULT_GROUP_ID, DEFAULT_TYPE_ID, DEFAULT_STATUS_ID, DEFAULT_PRIORITY,
-#      DEFAULT_SOURCE, CATCHALL_CLIENT_ID, HDB_TAG_ID, EMERGENCY_PRIORITY, DEBUG_LOGS
+#      DEFAULT_SOURCE, CATCHALL_CLIENT_ID, HDB_TAG_ID, EMERGENCY_PRIORITY, DEBUG_LOGS,
+#      HALO_TOKEN_ENFORCE (off|observe|enforce — see Security)
 
 # 4. Set secrets (never committed)
 wrangler secret put GORELO_API_KEY     # X-API-Key for Gorelo (ticket write + asset/contact/client read)
@@ -109,7 +110,7 @@ Configure Tier2 as a **HaloPSA — Cloud Hosted** integration:
 
 | Method & path | Auth | Purpose |
 |---|---|---|
-| `POST /token`, `/users`, `/client`, `/site`, `/asset`, `/tickets`, `/actions`, … | OAuth2 client_credentials + IP allowlist (routed by the `halo-app-name` header) | HaloPSA mock (see below) |
+| `POST /token`, `/users`, `/client`, `/site`, `/asset`, `/tickets`, `/actions`, … | IP allowlist (enforced by default) + optional bearer-token gate — see [Security](#security); routed by the `halo-app-name` header | HaloPSA mock (see below) |
 | `POST /admin/sync` | `X-Admin-Key` / `X-API-Key` / `Authorization: Bearer` = `<ADMIN_KEY>` | Refresh the D1 mirror on demand (fans location fetches out to the queue) |
 | `GET /admin/status` | `ADMIN_KEY` (same as `/admin/sync`) | Pretty JSON: mirror row counts, `lastSync`, and `locationQueue` (`queued` / `drained` / `lagSeconds`) — follow the location fan-out |
 | `POST /admin/test-webhook` | `ADMIN_KEY` (same as `/admin/sync`) | Fire a test alert through the dead-letter webhook and report its HTTP status |
@@ -122,7 +123,7 @@ naming the right one (not a misleading `404`). Anything else returns `404`.
 
 | Tier2 call | Worker response |
 |---|---|
-| `POST /token` (client_credentials) | OAuth2 bearer token (validates `HALO_CLIENT_ID/SECRET` if set) |
+| `POST /token` (client_credentials) | validates `HALO_CLIENT_ID/SECRET` (if set) and returns a bearer token — a signed HMAC token when creds are set, else an opaque one. Enforcement on the endpoints below is governed by `HALO_TOKEN_ENFORCE` (see [Security](#security)) |
 | `GET /users?search={email}` | the Gorelo **contact** (id/name/email/client/site); the `unregistered@helpdeskbuttons.com` catch-all maps to `CATCHALL_CLIENT_ID` |
 | `GET /client` / `GET /site` | Gorelo **clients** / **locations** from the mirror |
 | `GET /asset?search={hostname}` | the Gorelo **agent/device** (numeric surrogate id ↔ agent UUID) |
@@ -266,14 +267,50 @@ Gorelo's agent/client lists have no server-side filters, so they're mirrored int
 
 ## Security
 
-- **IP allowlist:** when `ENFORCE_IP_ALLOWLIST=true`, only Tier2's two fixed
-  source IPs (`34.202.14.153`, `3.209.57.193`, via `CF-Connecting-IP`) may reach
-  the Halo mock.
-- **Admin gate:** `/admin/sync` requires `ADMIN_KEY`. The optional Halo OAuth
-  credentials (`HALO_CLIENT_ID`/`HALO_CLIENT_SECRET`) are validated at `/token`
-  when set.
+- **IP allowlist (fails closed):** the allowlist is **ENFORCED by default** — only
+  Tier2's two fixed source IPs (`34.202.14.153`, `3.209.57.193`, via
+  `CF-Connecting-IP`) may reach the Halo mock. It is disabled **only** by an
+  explicit, normalized `ENFORCE_IP_ALLOWLIST` of `false`, `0`, or empty; an unset
+  var, `true`, or any other value enforces. An absent `CF-Connecting-IP` header
+  also fails closed.
+- **OAuth credentials → token enforcement:** setting `HALO_CLIENT_ID`/`HALO_CLIENT_SECRET`
+  makes `/token` validate them **and** mint a signed HMAC-SHA256 bearer token
+  (`payload.sig`, keyed by `HALO_CLIENT_SECRET`, with an `exp` claim; Web Crypto,
+  no new dependency). Whether that token then **protects the resource endpoints**
+  depends on `HALO_TOKEN_ENFORCE` (the gate is a no-op unless both credentials are
+  set, and never applies to `/token`):
+  - `off` (**default**) — no token check on resource endpoints. The credentials
+    gate `/token` issuance only; they do **not** protect `/users`, `/tickets`, etc.
+  - `observe` — the gate verifies the `Authorization: Bearer` token and logs a
+    non-PII breadcrumb (`present`/`missing`/`invalid`/`expired`) but never rejects.
+    Use this to confirm from real Tier2 traffic that a valid token is round-tripped.
+  - `enforce` — every non-`/token` Halo resource requires a valid, unexpired token;
+    otherwise the Worker returns `401 { "error": "invalid_token" }`. **Only in this
+    mode do the OAuth credentials protect the data endpoints.**
+
+  Rollout: deploy `off` → switch to `observe` and confirm the breadcrumbs show
+  `token=present` on live presses → then set `enforce`.
+- **Admin gate:** `/admin/sync` and `/admin/test-webhook` require `ADMIN_KEY`,
+  compared in constant time (length-checked XOR-accumulate) to avoid a timing oracle.
+- **Logging (no PII when `DEBUG_LOGS` is off):** all logging goes through one
+  chokepoint (`src/log.ts`) — `breadcrumb()` (always on, non-PII: ids, counts,
+  status codes, y/n flags) and `debug()` (verbose bodies/emails/hostnames, gated by
+  `DEBUG_LOGS`). The always-on routing line reports host presence (`host=y|n`), not
+  the hostname (which can embed a username). Handler errors return
+  `{ "error": "internal_error", "request_id": "<uuid>" }` with **no** internal
+  detail in the body; the `request_id` correlates to a single breadcrumb. Raw
+  upstream (Gorelo) error bodies and dead-letter destination strings are never
+  logged unless `DEBUG_LOGS` is on.
+- **Invocation logs:** `wrangler.toml` keeps `[observability.logs] invocation_logs`
+  **enabled** deliberately — Cloudflare captures per-request metadata (method, path,
+  status, timing) at the platform level regardless of source-level silence. This is
+  a conscious operator decision for a PHI-adjacent service: set `invocation_logs=false`
+  and/or lower `head_sampling_rate` if that retention is unacceptable.
 - Secrets are CLI-only (`wrangler secret put`) — never in code or `wrangler.toml`.
   The Gorelo key is never logged.
+
+> Not addressed here (require design decisions, tracked separately): request
+> **rate limiting** (F7) and **routing/contact-trust** hardening (F5).
 
 ## Tests
 

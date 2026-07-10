@@ -42,6 +42,12 @@ export interface Env {
   // If both set, the token endpoint validates them; otherwise any creds are accepted.
   HALO_CLIENT_ID?: string;
   HALO_CLIENT_SECRET?: string;
+  // Bearer-token enforcement on Halo resource endpoints (audit F1). Only active
+  // when BOTH HALO_CLIENT_ID and HALO_CLIENT_SECRET are set. Values (default off):
+  //   "off"     — no token check (identical to legacy behavior)
+  //   "observe" — verify the bearer token and log a breadcrumb, never reject
+  //   "enforce" — reject non-/token requests with 401 when the token is missing/invalid/expired
+  HALO_TOKEN_ENFORCE?: string;
 }
 
 /**

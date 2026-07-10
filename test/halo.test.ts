@@ -4,6 +4,7 @@ import worker from "../src/index.js";
 import { flushPendingTickets, haloResource, isHaloPath, isHaloRequest } from "../src/halo.js";
 import { initSchema } from "../src/db.js";
 import { assetNum } from "../src/sync.js";
+import { signToken } from "../src/token.js";
 
 const HOST = "https://t2t.example.com";
 const AGENT_UUID = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
@@ -162,6 +163,86 @@ describe("Halo OAuth token", () => {
   it("rejects a wrong client secret", async () => {
     const res = await req("/token", token("nope"));
     expect(res.status).toBe(401);
+  });
+
+  it("mints a signed HMAC token (payload.sig) when creds are set", async () => {
+    const res = await req("/token", token("halo-test-secret"));
+    const j = (await res.json()) as Record<string, unknown>;
+    // Signed token shape is `payload.sig` (two base64url parts), not a bare UUID.
+    expect(String(j.access_token).split(".")).toHaveLength(2);
+    expect(j.expires_in).toBe(3600);
+  });
+});
+
+describe("Halo bearer-token enforcement gate (audit F1)", () => {
+  const secret = "halo-test-secret";
+  const withMode = async (mode: string | undefined, fn: () => Promise<void>): Promise<void> => {
+    const prev = (env as { HALO_TOKEN_ENFORCE?: string }).HALO_TOKEN_ENFORCE;
+    (env as { HALO_TOKEN_ENFORCE?: string }).HALO_TOKEN_ENFORCE = mode;
+    try {
+      await fn();
+    } finally {
+      (env as { HALO_TOKEN_ENFORCE?: string }).HALO_TOKEN_ENFORCE = prev;
+    }
+  };
+  const bearer = async (): Promise<Record<string, string>> => ({
+    "halo-app-name": "tier2tech",
+    Authorization: `Bearer ${await signToken(secret, { exp: Math.floor(Date.now() / 1000) + 3600 })}`,
+  });
+
+  it("off (default): no token required — GET /users still resolves", async () => {
+    await withMode("off", async () => {
+      const res = await req("/users?search=user@corp.com", { headers: { "halo-app-name": "tier2tech" } });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  it("observe: never rejects a missing token, still answers 200", async () => {
+    await withMode("observe", async () => {
+      const res = await req("/users?search=user@corp.com", { headers: { "halo-app-name": "tier2tech" } });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  it("enforce: rejects a missing token with 401 invalid_token", async () => {
+    await withMode("enforce", async () => {
+      const res = await req("/users?search=user@corp.com", { headers: { "halo-app-name": "tier2tech" } });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ error: "invalid_token" });
+    });
+  });
+
+  it("enforce: rejects an invalid token with 401", async () => {
+    await withMode("enforce", async () => {
+      const res = await req("/users?search=user@corp.com", {
+        headers: { "halo-app-name": "tier2tech", Authorization: "Bearer not.a.valid.token" },
+      });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  it("enforce: accepts a valid signed token", async () => {
+    await withMode("enforce", async () => {
+      const res = await req("/users?search=user@corp.com", { headers: await bearer() });
+      expect(res.status).toBe(200);
+      const j = (await res.json()) as { users: Array<Record<string, unknown>> };
+      expect(j.users[0]).toMatchObject({ id: 55 });
+    });
+  });
+
+  it("enforce: /token itself is exempt (Tier2 has no token yet at that point)", async () => {
+    await withMode("enforce", async () => {
+      const res = await req("/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          client_id: "halo-test-id",
+          client_secret: secret,
+        }).toString(),
+      });
+      expect(res.status).toBe(200);
+    });
   });
 });
 

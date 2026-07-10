@@ -1,5 +1,6 @@
 import { initSchema, setLastSync, setSyncMeta } from "./db.js";
 import { GoreloClient } from "./gorelo.js";
+import { breadcrumb, describeError } from "./log.js";
 import { normalizeHost } from "./parse.js";
 import type {
   Env,
@@ -123,7 +124,7 @@ export async function syncAll(env: Env): Promise<SyncStats> {
     client.listAgents(),
     client.listClients(),
     client.listAllContacts().catch((err) => {
-      console.error(`sync: listAllContacts failed — skipping contact deletes: ${String(err)}`);
+      breadcrumb(`sync: listAllContacts failed — skipping contact deletes: ${describeError(err)}`);
       return null;
     }),
   ]);

@@ -3,11 +3,21 @@ main = "src/index.ts"
 compatibility_date = "2024-11-27"
 compatibility_flags = ["nodejs_compat"]
 
-# Workers Logs: capture console.log/console.warn (incl. the raw Gorelo create
-# response and any upstream failure bodies) in the dashboard for debugging.
+# Workers Logs: capture console.log/console.warn in the dashboard for debugging.
+# Source-level logging is silent by default — only non-PII breadcrumbs are emitted;
+# full request/response bodies require DEBUG_LOGS=true (see src/log.ts).
 [observability.logs]
 enabled = true
+# invocation_logs capture per-request metadata (method, path, status, timing, CF
+# headers) at the PLATFORM level, REGARDLESS of the source-level silence above.
+# Left ENABLED deliberately (audit F4): disabling it would blind ops to request
+# volume/latency/errors. This is a conscious operator decision for a PHI-adjacent
+# service — set invocation_logs=false if request-metadata retention is unacceptable,
+# and/or lower head_sampling_rate below to retain only a fraction of invocations.
 invocation_logs = true
+# Fraction of invocations whose logs are retained (0.0–1.0). 1.0 = keep all.
+# Lower it to reduce retained request metadata (another conscious ops decision).
+head_sampling_rate = 1.0
 
 # Two crons (differentiated in src/index.ts `scheduled` by `event.cron`):
 #   "0 */6 * * *"  refreshes the D1 mirror of Gorelo agents/clients (idempotent syncAll).
@@ -92,6 +102,18 @@ SEND_TICKET_CREATED_EMAIL = "true"
 # status + resolved ids). Set "true" to log full HALO CAPTURE/RESPONSE bodies — which
 # contain PII/PHI (names, emails, phones) — only for short debugging windows.
 DEBUG_LOGS = "false"
+
+# Bearer-token enforcement on the Halo resource endpoints (audit F1). Only takes
+# effect when BOTH HALO_CLIENT_ID and HALO_CLIENT_SECRET secrets are set; the
+# gate is skipped entirely otherwise, and /token is always exempt.
+#   "off"     (DEFAULT) no token check — identical to legacy behavior.
+#   "observe"          verify the Authorization: Bearer token and log a non-PII
+#                      breadcrumb (present/missing/invalid/expired) — never rejects.
+#   "enforce"          reject with 401 { "error": "invalid_token" } when the token
+#                      is missing/invalid/expired on any non-/token resource.
+# Rollout: deploy "off" -> switch to "observe" and confirm from breadcrumbs that
+# real Tier2 traffic round-trips a valid token -> only then set "enforce".
+HALO_TOKEN_ENFORCE = "off"
 
 # --- Secrets (set via CLI, never committed) ---
 #   wrangler secret put GORELO_API_KEY      # X-API-Key for Gorelo (ticket write + asset/contact/client read scopes)

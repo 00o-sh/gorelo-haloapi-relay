@@ -18,9 +18,11 @@ import {
 } from "./db.js";
 import { notify } from "@ambersecurityinc/notifly";
 import { GoreloClient, GoreloError, extractTicketNumber } from "./gorelo.js";
+import { breadcrumb, debug, debugOn, describeError } from "./log.js";
 import { normalizeEmail, normalizeHost } from "./parse.js";
 import { assetNum, syncAll } from "./sync.js";
 import { ipAllowed } from "./tier2.js";
+import { signToken, verifyTokenResult } from "./token.js";
 import type {
   CreatePublicTicketCommand,
   Env,
@@ -115,9 +117,8 @@ const jsonResponse = (status: number, body: unknown): Response =>
   });
 
 // Verbose logging (full request/response bodies) carries PII/PHI — the report
-// includes names, emails, phones — so it's OFF unless DEBUG_LOGS is enabled.
-// Operational logs (ids only, errors) are always emitted.
-const debugOn = (env: Env): boolean => /^(1|true|yes|on)$/i.test(env.DEBUG_LOGS ?? "");
+// includes names, emails, phones — so it's OFF unless DEBUG_LOGS is enabled
+// (see src/log.ts). Operational breadcrumbs (ids only, errors) are always emitted.
 
 function safeHeaders(request: Request): Record<string, string> {
   const out: Record<string, string> = {};
@@ -141,18 +142,39 @@ async function logCapture(request: Request, url: URL, env: Env): Promise<string>
   }
   if (debugOn(env)) {
     const redacted = body.replace(/(client_secret|password|secret)=([^&\s]+)/gi, "$1=<redacted>");
-    console.log(
+    debug(
+      env,
       `HALO CAPTURE ${request.method} ${url.pathname}${url.search} ` +
         `headers=${JSON.stringify(safeHeaders(request))} body=${redacted.slice(0, 2000)}`,
     );
   } else {
     // Non-PII breadcrumb: method + path only (search params can carry emails).
-    console.log(`HALO ${request.method} ${url.pathname}`);
+    breadcrumb(`HALO ${request.method} ${url.pathname}`);
   }
   return body;
 }
 
 // --- OAuth token ------------------------------------------------------------
+
+// Lifetime of a minted bearer token, echoed as `expires_in` and baked into the
+// signed token's `exp` claim.
+const TOKEN_TTL_SECONDS = 3600;
+
+/**
+ * Classify the inbound bearer token for the enforcement gate (audit F1):
+ * `missing` (no bearer header), `invalid` (bad signature/shape), `expired`, or
+ * `present` (valid & unexpired). Keyed by HALO_CLIENT_SECRET — no separate secret.
+ */
+async function bearerTokenStatus(
+  request: Request,
+  secret: string,
+): Promise<"present" | "missing" | "invalid" | "expired"> {
+  const auth = request.headers.get("Authorization") ?? "";
+  const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  if (!token) return "missing";
+  const r = await verifyTokenResult(secret, token);
+  return r.ok ? "present" : r.reason;
+}
 
 async function parseKeyValues(body: string, contentType: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
@@ -175,20 +197,24 @@ async function handleToken(request: Request, env: Env, url: URL, body: string): 
   const params = await parseKeyValues(body, ct);
   const clientId = params.client_id ?? "";
   const tenant = params.tenant ?? url.searchParams.get("tenant") ?? "";
-  if (debugOn(env)) {
-    console.log(`HALO token grant=${params.grant_type ?? ""} tenant=${tenant} client_id=${clientId}`);
-  }
+  debug(env, `HALO token grant=${params.grant_type ?? ""} tenant=${tenant} client_id=${clientId}`);
 
-  if (env.HALO_CLIENT_ID && env.HALO_CLIENT_SECRET) {
+  const credsSet = Boolean(env.HALO_CLIENT_ID && env.HALO_CLIENT_SECRET);
+  if (credsSet) {
     if (clientId !== env.HALO_CLIENT_ID || params.client_secret !== env.HALO_CLIENT_SECRET) {
       return jsonResponse(401, { error: "invalid_client" });
     }
   }
-  const token = crypto.randomUUID().replace(/-/g, "");
+  // With credentials set and validated, mint a signed HMAC token (keyed by
+  // HALO_CLIENT_SECRET) that the resource gate can verify (audit F1). With
+  // credentials unset, keep the legacy opaque token so nothing breaks.
+  const token = credsSet
+    ? await signToken(env.HALO_CLIENT_SECRET!, { exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS })
+    : crypto.randomUUID().replace(/-/g, "");
   return jsonResponse(200, {
     access_token: token,
     token_type: "Bearer",
-    expires_in: 3600,
+    expires_in: TOKEN_TTL_SECONDS,
     scope: params.scope ?? "all",
   });
 }
@@ -545,14 +571,16 @@ async function resolveRouting(env: Env, t: HaloTicket): Promise<Routing> {
   // A press flagged as an emergency bumps the ticket priority.
   const isEmergency = /this is an emergency/i.test(html);
 
-  // Operational routing log — no raw email (PII); the email is logged only under DEBUG_LOGS.
-  console.log(
-    `HALO routing: emailMatch=${email ? "y" : "n"} hostname=${hostname || "(none)"} ` +
+  // Operational routing breadcrumb — no raw email or hostname (both PII: a hostname
+  // can embed a username). Presence-only flags here; the values go behind DEBUG_LOGS.
+  breadcrumb(
+    `HALO routing: emailMatch=${email ? "y" : "n"} host=${hostname ? "y" : "n"} ` +
       `contact=${contactId ?? "MISS"} device=${device ? "hit" : "miss"} assets=${agentAssetIds.length} ` +
       `emergency=${isEmergency ? "y" : "n"} -> client=${clientId} location=${locationId ?? "none"} ` +
       `(assetSite=${asset.siteId ?? "none"})`,
   );
-  if (email && debugOn(env)) console.log(`HALO routing email=${email}`);
+  if (email) debug(env, `HALO routing email=${email}`);
+  if (hostname) debug(env, `HALO routing hostname=${hostname}`);
 
   return {
     clientId,
@@ -850,13 +878,13 @@ async function handleCreateTicket(env: Env, ctx: ExecutionContext | undefined, b
 
   const haloId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
   await putPendingTicket(env.DB, haloId, JSON.stringify(cmd), nowIso());
-  console.log(
-    `HALO queued ticket halo_id=${haloId} client=${routing.clientId} contact=${routing.contactId} assets=${routing.agentAssetIds.length}` +
-      (debugOn(env) ? ` email=${cmd.sendTicketCreatedEmail}` : ""),
+  breadcrumb(
+    `HALO queued ticket halo_id=${haloId} client=${routing.clientId} contact=${routing.contactId} ` +
+      `assets=${routing.agentAssetIds.length} email=${cmd.sendTicketCreatedEmail ? "y" : "n"}`,
   );
 
   // Opportunistically flush older orphans in the background (no-op when empty).
-  ctx?.waitUntil(flushPendingTickets(env).catch((e) => console.error("HALO opportunistic flush failed", String(e))));
+  ctx?.waitUntil(flushPendingTickets(env).catch((e) => breadcrumb(`HALO opportunistic flush failed ${describeError(e)}`)));
 
   // Echo a Halo-shaped created ticket so Tier2 can display/correlate it.
   return jsonResponse(201, {
@@ -903,14 +931,14 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
   const actionId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000;
 
   if (haloId == null) {
-    console.log("HALO action with no correlatable ticket id — accepted, nothing to attach");
+    breadcrumb("HALO action with no correlatable ticket id — accepted, nothing to attach");
     return jsonResponse(201, [{ id: actionId }]);
   }
 
   const pending = await takePendingTicket(env.DB, haloId);
   if (!pending) {
     // Already created (duplicate/late action) or unknown ticket — accept, no dup.
-    console.log(`HALO action halo_id=${haloId}: no pending to attach — accepted`);
+    breadcrumb(`HALO action halo_id=${haloId}: no pending to attach — accepted`);
     return jsonResponse(201, [{ id: actionId, ticket_id: haloId }]);
   }
 
@@ -930,16 +958,15 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
       .map((l) => `${esc(l.label)}: <a href="${esc(l.href)}">${esc(l.href)}</a>`)
       .join("<br>");
     cmd.description = `${cmd.description}<br><br><b>Helpdesk Buttons report</b><br>${rendered}`;
-    console.log(`HALO action halo_id=${haloId}: attached ${links.length} report link(s)`);
+    breadcrumb(`HALO action halo_id=${haloId}: attached ${links.length} report link(s)`);
   }
 
   try {
     const raw = await new GoreloClient(env).createTicket(cmd);
     const uuid = extractTicketNumber(raw) ?? "";
-    console.log(
-      `HALO created gorelo ticket ${uuid} from action (halo_id=${haloId} client=${cmd.clientId} contact=${cmd.contactId}` +
-        (debugOn(env) ? ` email=${cmd.sendTicketCreatedEmail}` : "") +
-        `)`,
+    breadcrumb(
+      `HALO created gorelo ticket ${uuid} from action (halo_id=${haloId} client=${cmd.clientId} ` +
+        `contact=${cmd.contactId} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
     );
     return jsonResponse(201, [{ id: actionId, ticket_id: haloId, gorelo_ticket_id: uuid }]);
   } catch (err) {
@@ -947,7 +974,7 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
     // which case dead-letter it (drop + log) so a bad command can't loop forever.
     const attempts = pending.attempts + 1;
     if (attempts >= MAX_PENDING_ATTEMPTS) {
-      console.error(`HALO dead-letter halo_id=${haloId} after ${attempts} attempts: ${String(err)}`);
+      breadcrumb(`HALO dead-letter halo_id=${haloId} after ${attempts} attempts: ${describeError(err)}`);
       const alert = postDeadLetter(env, { haloId, command: JSON.stringify(cmd), attempts, error: String(err) });
       if (ctx) ctx.waitUntil(alert);
       else await alert;
@@ -955,7 +982,10 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
       await putPendingTicket(env.DB, haloId, JSON.stringify(cmd), pending.created_at, attempts);
     }
     if (err instanceof GoreloError) {
-      console.error(`HALO action gorelo create rejected status=${err.status} response=${err.body}`);
+      // Non-PII breadcrumb: halo_id + status only. The raw upstream body (which can
+      // echo request internals) goes behind DEBUG_LOGS (audit F3).
+      breadcrumb(`HALO action gorelo create rejected halo_id=${haloId} status=${err.status}`);
+      debug(env, `HALO action gorelo create rejected halo_id=${haloId} status=${err.status} response=${err.body}`);
       return jsonResponse(502, { error: "gorelo_create_failed", status: err.status });
     }
     throw err;
@@ -1000,9 +1030,11 @@ async function postDeadLetter(
   const results = await notify({ urls }, { title, body, type: "failure" });
   const failed = results.filter((r) => !r.success);
   if (failed.length) {
-    console.error(
+    // Log only the failing service names + a static code — never f.error, which can
+    // embed a NOTIFLY_URLS destination and a Teams `sig=` token (audit F8).
+    breadcrumb(
       `HALO dead-letter notify failures halo_id=${info.haloId}: ` +
-        failed.map((f) => `${f.service}:${f.error ?? "?"}`).join("; "),
+        failed.map((f) => `${f.service}:delivery_failed`).join("; "),
     );
   }
 }
@@ -1033,9 +1065,9 @@ export async function postSyncFailure(
   );
   const failed = results.filter((r) => !r.success);
   if (failed.length) {
-    console.error(
-      `sync-failure notify errors: ${failed.map((f) => `${f.service}:${f.error ?? "?"}`).join("; ")}`,
-    );
+    // Service names + a static code only — never f.error, which can embed a
+    // NOTIFLY_URLS destination / Teams `sig=` token (audit F8).
+    breadcrumb(`sync-failure notify errors: ${failed.map((f) => `${f.service}:delivery_failed`).join("; ")}`);
   }
 }
 
@@ -1075,15 +1107,14 @@ export async function flushPendingTickets(env: Env): Promise<number> {
       const raw = await client.createTicket(cmd);
       const uuid = extractTicketNumber(raw) ?? "";
       created++;
-      console.log(
-        `HALO orphan-flush created gorelo ticket ${uuid} (halo_id=${row.halo_id}` +
-          (debugOn(env) ? ` contact=${cmd.contactId} email=${cmd.sendTicketCreatedEmail}` : "") +
-          `)`,
+      breadcrumb(
+        `HALO orphan-flush created gorelo ticket ${uuid} (halo_id=${row.halo_id} ` +
+          `contact=${cmd.contactId} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
       );
     } catch (err) {
       const attempts = row.attempts + 1;
       if (attempts >= MAX_PENDING_ATTEMPTS) {
-        console.error(`HALO dead-letter halo_id=${row.halo_id} after ${attempts} attempts: ${String(err)}`);
+        breadcrumb(`HALO dead-letter halo_id=${row.halo_id} after ${attempts} attempts: ${describeError(err)}`);
         await postDeadLetter(env, {
           haloId: row.halo_id,
           command: row.command,
@@ -1092,7 +1123,7 @@ export async function flushPendingTickets(env: Env): Promise<number> {
         });
       } else {
         await putPendingTicket(env.DB, row.halo_id, row.command, row.created_at, attempts);
-        console.error(`HALO orphan-flush failed halo_id=${row.halo_id} (attempt ${attempts}): ${String(err)}`);
+        breadcrumb(`HALO orphan-flush failed halo_id=${row.halo_id} (attempt ${attempts}): ${describeError(err)}`);
       }
     }
   }
@@ -1134,10 +1165,11 @@ async function handleApi(
 async function ensureSynced(env: Env): Promise<void> {
   await initSchema(env.DB);
   if (!(await getLastSync(env.DB))) {
-    console.log("HALO: no last_sync — running inline bootstrap sync");
+    breadcrumb("HALO: no last_sync — running inline bootstrap sync");
     await syncAll(env).catch(async (err) => {
-      console.error("HALO bootstrap sync failed", String(err));
-      await postSyncFailure(env, { source: "bootstrap", error: String(err) });
+      const detail = describeError(err);
+      breadcrumb(`HALO bootstrap sync failed ${detail}`);
+      await postSyncFailure(env, { source: "bootstrap", error: detail });
     });
   }
 }
@@ -1151,8 +1183,26 @@ export async function handleHalo(
   const body = await logCapture(request, url, env);
 
   if (!ipAllowed(request, env)) {
-    console.warn("HALO rejected: source IP not allowlisted");
+    breadcrumb("HALO rejected: source IP not allowlisted");
     return jsonResponse(403, { error: "forbidden" });
+  }
+
+  const resource = haloResource(url.pathname);
+
+  // Bearer-token gate (audit F1). No-op unless BOTH HALO_CLIENT_ID and
+  // HALO_CLIENT_SECRET are set, and never applies to /token itself. Three modes:
+  //   off      — no token check (default; identical to legacy behavior)
+  //   observe  — verify + breadcrumb the outcome, never reject
+  //   enforce  — 401 { error: "invalid_token" } when the token is not present-&-valid
+  if (env.HALO_CLIENT_ID && env.HALO_CLIENT_SECRET && resource !== "token") {
+    const mode = (env.HALO_TOKEN_ENFORCE ?? "off").trim().toLowerCase();
+    if (mode === "observe" || mode === "enforce") {
+      const status = await bearerTokenStatus(request, env.HALO_CLIENT_SECRET);
+      breadcrumb(`HALO token ${mode} resource=${resource} token=${status}`);
+      if (mode === "enforce" && status !== "present") {
+        return jsonResponse(401, { error: "invalid_token" });
+      }
+    }
   }
 
   // Always return decodable JSON: Tier2's Halo client fails hard ("could not
@@ -1160,27 +1210,29 @@ export async function handleHalo(
   // as an HTML/text 500.
   let res: Response;
   try {
-    if (haloResource(url.pathname) === "token") {
+    if (resource === "token") {
       res = await handleToken(request, env, url, body);
     } else {
       await ensureSynced(env);
       res = await handleApi(request, env, ctx, url, body);
     }
   } catch (err) {
-    console.error(`HALO handler error ${request.method} ${url.pathname}:`, String(err));
-    res = jsonResponse(500, { error: "internal_error", detail: String(err).slice(0, 300) });
+    // No internals in the 500 body or the always-on log (audit F3): correlate via a
+    // short request id and keep the describeError detail out of the response entirely.
+    const requestId = crypto.randomUUID();
+    breadcrumb(`HALO handler error ${request.method} ${url.pathname} id=${requestId} ${describeError(err)}`);
+    res = jsonResponse(500, { error: "internal_error", request_id: requestId });
   }
 
-  // Full response body carries PII — log it only under DEBUG_LOGS; otherwise just status.
+  // Always-on status breadcrumb; the full response body (PII) only under DEBUG_LOGS.
+  breadcrumb(`HALO RESPONSE ${res.status} ${request.method} ${url.pathname}`);
   if (debugOn(env)) {
     try {
       const out = await res.clone().text();
-      console.log(`HALO RESPONSE ${res.status} ${request.method} ${url.pathname} -> ${out.slice(0, 1500)}`);
+      debug(env, `HALO RESPONSE body ${res.status} ${request.method} ${url.pathname} -> ${out.slice(0, 1500)}`);
     } catch {
       /* ignore */
     }
-  } else {
-    console.log(`HALO RESPONSE ${res.status} ${request.method} ${url.pathname}`);
   }
   return res;
 }
