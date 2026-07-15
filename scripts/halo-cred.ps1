@@ -27,6 +27,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Resolve the repo root (this script's parent dir) so wrangler is pointed at the
+# repo's wrangler.toml regardless of the caller's working directory — otherwise
+# wrangler can't find the config and fails with "Required Worker name missing".
+$ScriptDir = Split-Path -Parent $PSCommandPath
+$RepoRoot = Split-Path -Parent $ScriptDir
+$WranglerConfig = Join-Path $RepoRoot 'wrangler.toml'
+
 # tier2 keeps the original un-suffixed var names; every other product is suffixed
 # with its uppercased key (matches clientIdVar/clientSecretVar in src/products.ts).
 if ($Product -eq 'tier2') {
@@ -61,10 +68,13 @@ Write-Host "--------------------------------------------------------------------
 Write-Host ""
 
 $extra = ($WranglerArgs -join ' ')
+# --config points wrangler at the repo's wrangler.toml so it works from any CWD;
+# without it wrangler can't find the config and fails "Required Worker name missing".
+$cfg = "--config `"$WranglerConfig`""
 
 if ($env:DRY_RUN -eq '1') {
     Write-Host "DRY_RUN=1 - not calling wrangler. To apply:"
-    Write-Host "  `$env:HALO_SECRET='$ClientSecret'; `$env:HALO_SECRET | npx wrangler secret put $SecretVar $extra"
+    Write-Host "  `$env:HALO_SECRET='$ClientSecret'; `$env:HALO_SECRET | npx wrangler secret put $SecretVar $cfg $extra"
     Write-Host "  # then set $IdVar=`"$ClientId`" in wrangler.toml [vars] (or secret-put it too)"
     exit 0
 }
@@ -77,11 +87,11 @@ $psi = New-Object System.Diagnostics.ProcessStartInfo
 $isWin = $IsWindows -or ($env:OS -eq 'Windows_NT')
 if ($isWin) {
     $psi.FileName = 'cmd.exe'
-    $psi.Arguments = "/c npx wrangler secret put $SecretVar $extra"
+    $psi.Arguments = "/c npx wrangler secret put $SecretVar $cfg $extra"
 }
 else {
     $psi.FileName = 'npx'
-    $psi.Arguments = "wrangler secret put $SecretVar $extra"
+    $psi.Arguments = "wrangler secret put $SecretVar $cfg $extra"
 }
 $psi.RedirectStandardInput = $true
 $psi.UseShellExecute = $false
@@ -94,7 +104,7 @@ if ($proc.ExitCode -ne 0) { exit $proc.ExitCode }
 Write-Host ""
 Write-Host "Done. Remaining step: set the (non-secret) client_id so the relay can validate it -"
 Write-Host "  add to wrangler.toml [vars]:  $IdVar = `"$ClientId`""
-Write-Host "  (or push it as a secret too:  `$env:HALO_ID='$ClientId'; `$env:HALO_ID | npx wrangler secret put $IdVar $extra)"
+Write-Host "  (or push it as a secret too:  `$env:HALO_ID='$ClientId'; `$env:HALO_ID | npx wrangler secret put $IdVar $cfg $extra)"
 Write-Host ""
 Write-Host "Both parts must resolve non-empty for $Product to be validated + token-enforced;"
 Write-Host "leave them unset to keep $Product lenient (any creds accepted) during rollout."

@@ -18,6 +18,13 @@
 # /dev/urandom) and wrangler.
 set -euo pipefail
 
+# Resolve the repo root (this script's parent dir) so wrangler is pointed at the
+# repo's wrangler.toml regardless of the caller's working directory — otherwise
+# wrangler can't find the config and fails with "Required Worker name missing".
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "${SCRIPT_DIR}")"
+WRANGLER_CONFIG="${REPO_ROOT}/wrangler.toml"
+
 PRODUCT="${1:-}"
 if [[ -z "${PRODUCT}" ]]; then
   echo "usage: $0 <product-key> [extra wrangler args...]   (e.g. tier2, huntress)" >&2
@@ -60,19 +67,20 @@ echo
 
 if [[ "${DRY_RUN:-}" == "1" ]]; then
   echo "DRY_RUN=1 — not calling wrangler. To apply:"
-  echo "  printf %s '${CLIENT_SECRET}' | npx wrangler secret put ${SECRET_VAR} $*"
+  echo "  printf %s '${CLIENT_SECRET}' | npx wrangler secret put ${SECRET_VAR} --config '${WRANGLER_CONFIG}' $*"
   echo "  # then set ${ID_VAR}=\"${CLIENT_ID}\" in wrangler.toml [vars] (or secret-put it too)"
   exit 0
 fi
 
 # Pipe the secret to wrangler on stdin so it never lands in shell history/argv.
+# --config points wrangler at the repo's wrangler.toml so it works from any CWD.
 echo "Pushing ${SECRET_VAR} via wrangler secret put..."
-printf '%s' "${CLIENT_SECRET}" | npx wrangler secret put "${SECRET_VAR}" "$@"
+printf '%s' "${CLIENT_SECRET}" | npx wrangler secret put "${SECRET_VAR}" --config "${WRANGLER_CONFIG}" "$@"
 
 echo
 echo "Done. Remaining step: set the (non-secret) client_id so the relay can validate it —"
 echo "  add to wrangler.toml [vars]:  ${ID_VAR} = \"${CLIENT_ID}\""
-echo "  (or push it as a secret too:  printf %s '${CLIENT_ID}' | npx wrangler secret put ${ID_VAR} $*)"
+echo "  (or push it as a secret too:  printf %s '${CLIENT_ID}' | npx wrangler secret put ${ID_VAR} --config '${WRANGLER_CONFIG}' $*)"
 echo
 echo "Both parts must resolve non-empty for ${PRODUCT} to be validated + token-enforced;"
 echo "leave them unset to keep ${PRODUCT} lenient (any creds accepted) during rollout."
