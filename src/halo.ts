@@ -21,7 +21,7 @@ import { GoreloClient, GoreloError, extractTicketNumber } from "./gorelo.js";
 import { breadcrumb, debug, debugOn, describeError } from "./log.js";
 import { normalizeEmail, normalizeHost } from "./parse.js";
 import { assetNum, syncAll } from "./sync.js";
-import { ipAllowed } from "./products.js";
+import { ipAllowed, matchProduct, type Product } from "./products.js";
 import { signToken, verifyTokenResult } from "./token.js";
 import type {
   CreatePublicTicketCommand,
@@ -535,7 +535,7 @@ interface Routing {
   report: Record<string, string>;
 }
 
-async function resolveRouting(env: Env, t: HaloTicket): Promise<Routing> {
+async function resolveRouting(env: Env, t: HaloTicket, product: Product | null): Promise<Routing> {
   const html = str(t.details_html) || str(t.details);
   const report = parseReport(html);
   const email = requesterEmail(t) || reportEmail(report, html);
@@ -590,7 +590,8 @@ async function resolveRouting(env: Env, t: HaloTicket): Promise<Routing> {
   // ticket shows the machine detail HDB keeps behind its portal link. Best-effort.
   const agentDetail = device?.agent_id ? await new GoreloClient(env).getAgent(device.agent_id) : null;
 
-  const contactName = contact?.name || report.name || email || "Helpdesk Buttons";
+  const contactName =
+    contact?.name || report.name || email || product?.ticketCreatedBy || "Helpdesk Buttons";
   // A press flagged as an emergency bumps the ticket priority.
   const isEmergency = /this is an emergency/i.test(html);
 
@@ -640,6 +641,7 @@ const DUMP_SKIP = new Set([
   "user_id",
   "client_id",
   "site_id",
+  "tickettype_id",
   "assets",
 ]);
 
@@ -808,11 +810,13 @@ function extraFieldLines(t: HaloTicket): string[] {
 }
 
 /** Build the ticket description as HTML: report + extra fields + device + routing. */
-function buildHaloDescription(t: HaloTicket, routing: Routing): string {
+function buildHaloDescription(t: HaloTicket, routing: Routing, product: Product | null): string {
   const raw = str(t.details_html) || str(t.details) || str(t.summary);
   const sections: string[] = [];
 
-  // Report Summary — one line per field; non-default selections as bullets.
+  // Body section — one line per report field (non-default selections as bullets) for
+  // Tier2's HDB report, or the plain details for a product that sends free text. The
+  // heading follows the product (Tier2 "Report Summary", else e.g. "Details").
   const pairs = parseReportPairs(raw);
   const rows = pairs
     .filter((p) => p.label.toLowerCase() !== "selections")
@@ -824,7 +828,7 @@ function buildHaloDescription(t: HaloTicket, routing: Routing): string {
   const report = rows.length
     ? rows.join("<br>")
     : esc(truncate(htmlToText(raw), BODY_MAX)).replace(/\n/g, "<br>");
-  sections.push(`${heading("Report Summary")}<br>${report}`);
+  sections.push(`${heading(product?.ticketBodyHeading || "Report Summary")}<br>${report}`);
 
   // Any other submitted fields (rarely present after trimming the routing ids).
   const extras = extraFieldLines(t);
@@ -860,7 +864,12 @@ function extractNoteLinks(html: string): Array<{ label: string; href: string }> 
   return out;
 }
 
-function buildTicketCommand(env: Env, t: HaloTicket, routing: Routing): CreatePublicTicketCommand {
+function buildTicketCommand(
+  env: Env,
+  t: HaloTicket,
+  routing: Routing,
+  product: Product | null,
+): CreatePublicTicketCommand {
   const summary = str(t.summary) || str(t.subject) || "(no subject)";
   const tagId = num(env.HDB_TAG_ID);
   // "This is an emergency" bumps the priority (when EMERGENCY_PRIORITY is set).
@@ -872,7 +881,7 @@ function buildTicketCommand(env: Env, t: HaloTicket, routing: Routing): CreatePu
     clientId: routing.clientId,
     locationId: routing.locationId,
     contactId: routing.contactId,
-    description: buildHaloDescription(t, routing),
+    description: buildHaloDescription(t, routing, product),
     statusId: Number(env.DEFAULT_STATUS_ID),
     groupId: Number(env.DEFAULT_GROUP_ID),
     typeId: Number(env.DEFAULT_TYPE_ID),
@@ -894,22 +903,8 @@ function buildTicketCommand(env: Env, t: HaloTicket, routing: Routing): CreatePu
  * id we return, and let the /actions note fold in before the create. An orphan
  * flush (cron + opportunistic) creates any ticket whose note never arrives.
  */
-async function handleCreateTicket(env: Env, ctx: ExecutionContext | undefined, body: string): Promise<Response> {
-  const t = firstTicket(parseJson(body));
-  const routing = await resolveRouting(env, t);
-  const cmd = buildTicketCommand(env, t, routing);
-
-  const haloId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
-  await putPendingTicket(env.DB, haloId, JSON.stringify(cmd), nowIso());
-  breadcrumb(
-    `HALO queued ticket halo_id=${haloId} client=${routing.clientId} contact=${routing.contactId} ` +
-      `assets=${routing.agentAssetIds.length} email=${cmd.sendTicketCreatedEmail ? "y" : "n"}`,
-  );
-
-  // Opportunistically flush older orphans in the background (no-op when empty).
-  ctx?.waitUntil(flushPendingTickets(env).catch((e) => breadcrumb(`HALO opportunistic flush failed ${describeError(e)}`)));
-
-  // Echo a Halo-shaped created ticket so Tier2 can display/correlate it.
+/** Echo a Halo-shaped created ticket (the 201 Faults object) so the caller can correlate. */
+function haloCreatedTicket(env: Env, haloId: number, cmd: CreatePublicTicketCommand, t: HaloTicket, routing: Routing): Response {
   return jsonResponse(201, {
     id: haloId,
     summary: cmd.title,
@@ -920,6 +915,53 @@ async function handleCreateTicket(env: Env, ctx: ExecutionContext | undefined, b
     tickettype_id: Number(env.DEFAULT_TYPE_ID),
     status_id: Number(env.DEFAULT_STATUS_ID),
   });
+}
+
+async function handleCreateTicket(
+  env: Env,
+  ctx: ExecutionContext | undefined,
+  body: string,
+  product: Product | null,
+): Promise<Response> {
+  const t = firstTicket(parseJson(body));
+  const routing = await resolveRouting(env, t, product);
+  const cmd = buildTicketCommand(env, t, routing, product);
+  const haloId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
+
+  // One-shot products (deferCreate=false, e.g. Huntress) send the whole ticket here
+  // and never follow up with a /actions note, so there is nothing to fold in — create
+  // the Gorelo ticket immediately. On failure, fall back to the pending queue so the
+  // orphan flush retries it (same resilience as the deferred path below).
+  if (product && !product.deferCreate) {
+    try {
+      const raw = await new GoreloClient(env).createTicket(cmd);
+      const uuid = extractTicketNumber(raw) ?? "";
+      breadcrumb(
+        `HALO created gorelo ticket ${uuid} immediately (product=${product.key} halo_id=${haloId} ` +
+          `client=${routing.clientId} contact=${routing.contactId} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
+      );
+    } catch (err) {
+      await putPendingTicket(env.DB, haloId, JSON.stringify(cmd), nowIso());
+      breadcrumb(
+        `HALO immediate create failed (product=${product.key} halo_id=${haloId}), queued for retry: ${describeError(err)}`,
+      );
+    }
+    return haloCreatedTicket(env, haloId, cmd, t, routing);
+  }
+
+  // Tier2 two-step flow: DON'T create yet. Queue the command keyed by the Halo id we
+  // return; the /actions note folds in before the create, else the orphan flush
+  // (cron + opportunistic) creates it note-less after the grace window.
+  await putPendingTicket(env.DB, haloId, JSON.stringify(cmd), nowIso());
+  breadcrumb(
+    `HALO queued ticket halo_id=${haloId} client=${routing.clientId} contact=${routing.contactId} ` +
+      `assets=${routing.agentAssetIds.length} email=${cmd.sendTicketCreatedEmail ? "y" : "n"}`,
+  );
+
+  // Opportunistically flush older orphans in the background (no-op when empty).
+  ctx?.waitUntil(flushPendingTickets(env).catch((e) => breadcrumb(`HALO opportunistic flush failed ${describeError(e)}`)));
+
+  return haloCreatedTicket(env, haloId, cmd, t, routing);
 }
 
 /** Parse "...ticket number 264274883401817..." out of a note's text. */
@@ -1166,7 +1208,7 @@ async function handleApi(
   const method = request.method;
 
   if (resource === "ticket" || resource === "tickets") {
-    if (method === "POST") return handleCreateTicket(env, ctx, body);
+    if (method === "POST") return handleCreateTicket(env, ctx, body, matchProduct(request, env));
     return jsonResponse(200, { tickets: [], record_count: 0 });
   }
   if (resource === "action" || resource === "actions") {

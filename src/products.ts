@@ -20,6 +20,16 @@ export interface Product {
   // UA is client-controlled/spoofable, so it only tightens an IP-passing request,
   // never widens access.
   userAgent?: string;
+
+  // Ticket-create behavior. Tier2 posts /tickets then a separate /actions note, so
+  // the Gorelo create is DEFERRED to fold the note in. One-shot products (Huntress)
+  // send the whole ticket in the create and never post /actions, so their create
+  // fires immediately (deferCreate=false).
+  deferCreate: boolean;
+  // Submitter-name fallback for a ticket from this product when no contact resolves.
+  ticketCreatedBy: string;
+  // Heading over the pasted ticket body (Tier2 uses Helpdesk-Buttons "Report Summary").
+  ticketBodyHeading: string;
 }
 
 /**
@@ -41,6 +51,9 @@ export const PRODUCTS: Record<string, Product> = {
     defaultEnabled: true,
     ips: new Set(["34.202.14.153", "3.209.57.193"]),
     cidrs: [],
+    deferCreate: true, // two-step: /tickets then /actions note folds in before the create
+    ticketCreatedBy: "Helpdesk Buttons",
+    ticketBodyHeading: "Report Summary",
   },
   // Huntress — additional source IPs + /28 ranges. Opt-in (off by default).
   // Gated on IP AND its self-declared User-Agent ("Huntress Halo Integration").
@@ -52,6 +65,9 @@ export const PRODUCTS: Record<string, Product> = {
     ips: new Set(["52.4.130.244", "34.205.224.75", "184.72.103.99", "107.21.187.4"]),
     cidrs: ["4.150.82.176/28", "172.200.220.176/28"],
     userAgent: "Huntress Halo Integration",
+    deferCreate: false, // one-shot: the whole ticket arrives in the create, no /actions note
+    ticketCreatedBy: "Huntress",
+    ticketBodyHeading: "Details",
   },
 };
 

@@ -850,3 +850,69 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     expect(row).toBeNull();
   });
 });
+
+describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
+  // Drive the request as Huntress: its source IP + self-declared User-Agent, with
+  // ENABLE_HUNTRESS on so matchProduct resolves the product.
+  const huntressInit = (bodyObj: unknown): RequestInit => ({
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "user-agent": "Huntress Halo Integration",
+      "CF-Connecting-IP": "52.4.130.244",
+    },
+    body: JSON.stringify(bodyObj),
+  });
+
+  async function withHuntressEnabled(fn: () => Promise<void>): Promise<void> {
+    const e = env as { ENABLE_HUNTRESS?: string };
+    const prev = e.ENABLE_HUNTRESS;
+    e.ENABLE_HUNTRESS = "true";
+    try {
+      await fn();
+    } finally {
+      e.ENABLE_HUNTRESS = prev;
+    }
+  }
+
+  it("creates the Gorelo ticket immediately (no queue) on the /api/Tickets POST", async () => {
+    await withHuntressEnabled(async () => {
+      const cap = captureGoreloCreate();
+      const res = await req(
+        "/api/Tickets",
+        huntressInit([
+          { summary: "Huntress Test", details: "hello world", client_id: "10", tickettype_id: "7045" },
+        ]),
+      );
+      expect(res.status).toBe(201);
+      // Immediate: the Gorelo create fired on this POST (unlike Tier2's deferred path).
+      const posted = cap.posted();
+      expect(posted).toBeDefined();
+      expect(posted).toMatchObject({ title: "Huntress Test", clientId: 10 });
+      // The free-text details land in the description (not the HDB "Report Summary").
+      expect(String(posted!.description)).toContain("hello world");
+      expect(String(posted!.description)).toContain("Details");
+      // Nothing left queued.
+      const row = await env.DB.prepare(`SELECT halo_id FROM pending_tickets`).first();
+      expect(row).toBeNull();
+    });
+  });
+
+  it("falls back to the pending queue if the immediate Gorelo create fails", async () => {
+    await withHuntressEnabled(async () => {
+      routes.push({
+        method: "POST",
+        match: (u) => u.pathname === "/v1/tickets",
+        handler: () => json(500, { error: "boom" }),
+      });
+      const res = await req("/api/Tickets", huntressInit([{ summary: "Huntress Retry", details: "x", client_id: "10" }]));
+      // Still 201 to the caller; the command is queued so the orphan flush retries it.
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as Record<string, unknown>;
+      const row = await env.DB.prepare(`SELECT command FROM pending_tickets WHERE halo_id = ?`)
+        .bind(body.id)
+        .first<{ command: string }>();
+      expect(row).not.toBeNull();
+    });
+  });
+});
