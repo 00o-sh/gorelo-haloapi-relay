@@ -481,13 +481,14 @@ function decodeEntities(s: string): string {
 function htmlToText(s: string): string {
   // Drop non-content blocks first — a full HTML email (the /actions note) carries
   // <head>/<style> with @font-face/@media rules that otherwise flatten into noise.
-  // Match end tags tolerantly (`</script >`, `</script\n>`): browsers ignore
-  // whitespace before the `>`, so a naive `</script>` would leave the block's
-  // contents behind and let them flatten into the extracted text.
+  // Match end tags tolerantly (`</script >`, `</script\t\n bar>`): a browser
+  // closes on `</script` followed by anything up to the next `>`, so a naive
+  // `</script>` would leave the block's contents behind to flatten into the
+  // extracted text. `[^>]*>` consumes any trailing junk before the `>`.
   const stripped = s
-    .replace(/<style[\s\S]*?<\/style\s*>/gi, " ")
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, " ")
-    .replace(/<head[\s\S]*?<\/head\s*>/gi, " ");
+    .replace(/<style[\s\S]*?<\/style[^>]*>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script[^>]*>/gi, " ")
+    .replace(/<head[\s\S]*?<\/head[^>]*>/gi, " ");
   return decodeEntities(stripTags(stripped))
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
