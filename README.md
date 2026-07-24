@@ -205,24 +205,23 @@ Report** link (screenshots/diagnostics). The routing outcome is logged, not show
 **Priority:** a press flagged "This is an emergency" is created at `EMERGENCY_PRIORITY`
 (else `DEFAULT_PRIORITY`).
 
-**Known limitation — the ticket number echoed back is not the Gorelo ticket
-number.** For **every** product, the create response returns a synthetic id — the
-`haloId` in `src/halo.ts`, a surrogate of a random UUID — **not** the number Gorelo
-assigns. So anything that shows or checks it (Tier2's "Help Data Delivered" screen,
-Huntress's ticket link) gets the random mock, never a real number. Why:
-- Gorelo's `POST /v1/tickets` returns only `{ "ticketId": "<uuid>" }` — an internal
-  id, **no** human-readable ticket number — and there's no GET-ticket / list-tickets
-  endpoint to read a number back or to *check* a ticket afterward.
-- For deferred products (Tier2) the real Gorelo ticket isn't even created until the
-  `/actions` note arrives, so there's nothing to return at `POST /tickets` time.
+**The real Gorelo ticket number is now resolved and surfaced.** Gorelo's
+`POST /v1/tickets` returns only the ticket GUID (`{ "id": "<uuid>" }`), but the
+`GET /v1/tickets` list (added 2026-07) carries the human `number` / `displayNumber`.
+After each create the relay reads the number back by matching that GUID
+(`GoreloClient.resolveTicketNumber`) and surfaces it:
+- **Immediate products (Huntress)** create in-line, so the created-ticket response
+  includes `gorelo_ticket_number` / `gorelo_display_number`.
+- **Deferred products (Tier2)** don't create the Gorelo ticket until the `/actions`
+  note arrives, so the number is returned on the **`/actions`** response
+  (`gorelo_ticket_number` / `gorelo_display_number`) — the earliest it's knowable.
 
-The immediate path (Huntress) creates the ticket in-line but still only receives that
-`ticketId` uuid — not a displayable number — and returns the `haloId` mock regardless,
-so both products are in the same spot. Gorelo has indicated an API update exposing the
-created ticket number is expected within ~a month; a full fix also needs a
-`GET /api/Tickets/{id}` that resolves the real ticket to check it. The Gorelo-side
-ticket itself is created correctly — only the number echoed back is a placeholder.
-Tracked in [#35](https://github.com/salientmsp/tier2tickets-relay/issues/35).
+The lookup is best-effort (a failed read-back never blocks ticket creation), and it
+does **not** change the synthetic `haloId` echoed at `POST /tickets` time — for the
+deferred flow the Gorelo ticket doesn't exist yet at that moment, so Tier2's
+"Help Data Delivered" screen still shows the surrogate unless it reads the number
+from the later `/actions` response. Tracked in
+[#35](https://github.com/salientmsp/tier2tickets-relay/issues/35).
 
 **Requester email:** Gorelo's "ticket created" email is suppressed by default
 (`sendTicketCreatedEmail=false`). Set `SEND_TICKET_CREATED_EMAIL=true` to enable it —
@@ -456,12 +455,17 @@ report-link extraction, orphan flush), and the string normalizers.
 
 ## Gorelo API notes
 
-A snapshot of the live spec is captured at [`docs/gorelo-swagger.v1.json`](docs/gorelo-swagger.v1.json)
-(v1, captured 2026-07-08).
+A snapshot of the live spec is captured at [`docs/gorelo-swagger.v1.json`](docs/gorelo-swagger.v1.json).
+See [`docs/gorelo-swagger.md`](docs/gorelo-swagger.md) for the source URL and how the
+snapshot is kept fresh — a nightly [drift workflow](.github/workflows/gorelo-swagger-drift.yml)
+opens a PR when the live spec changes.
 
-- **`POST /v1/tickets` response** — `{ "ticketId": "<uuid>" }`. No human ticket
-  number, no GET-ticket / list-tickets endpoint. `extractTicketNumber` reads
-  `ticketId`.
+- **`POST /v1/tickets` response** — `{ "id": "<uuid>" }` (the ticket's GUID, not a
+  human number). `extractTicketNumber` reads `id`.
+- **`GET /v1/tickets`** — paged list (`cursor` / `pageSize` / `sortBy` / `sortOrder`),
+  returning `{ data: PublicTicketListItemModel[], nextCursor, hasMore, ... }`. Each item
+  carries the human-readable `number` / `displayNumber`, so the real ticket number can be
+  read back after a create by matching the created `id`.
 - **`agentAssetIds`** — array of agent UUIDs (`PublicDeviceResponse.id`). Only RMM
   **agent** assets are linkable; `/v1/assets/agents` is the only asset read endpoint,
   so custom/manual assets can't be discovered or mapped.

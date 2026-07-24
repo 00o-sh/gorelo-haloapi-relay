@@ -489,19 +489,40 @@ const reportHtml = (opts: {
      ${opts.selections ? `<tr><td style="font-weight:600;">Selections:</td><td>${opts.selections}</td></tr>` : ""}
    </tbody></table>`;
 
-/** Capture the single Gorelo create call (returns a fixed ticket uuid). */
-function captureGoreloCreate(uuid = "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a"): {
-  posted: () => Record<string, unknown> | undefined;
-} {
+/**
+ * Capture the single Gorelo create call (returns a fixed ticket uuid, matching
+ * the live `{ id }` shape) and mock the GET /v1/tickets read-back the relay uses
+ * to resolve the human number from that uuid. Pass `number`/`displayNumber` to
+ * control what the list returns; pass `listTickets: false` to omit the GET mock
+ * (the relay then resolves no number — a best-effort miss).
+ */
+function captureGoreloCreate(
+  opts: {
+    uuid?: string;
+    number?: number | null;
+    displayNumber?: string | null;
+    listTickets?: boolean;
+  } = {},
+): { posted: () => Record<string, unknown> | undefined } {
+  const uuid = opts.uuid ?? "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a";
+  const number = opts.number ?? 264274883401817;
+  const displayNumber = opts.displayNumber ?? "T-100234";
   let posted: Record<string, unknown> | undefined;
   routes.push({
     method: "POST",
     match: (u) => u.pathname === "/v1/tickets",
     handler: async (r) => {
       posted = (await r.json()) as Record<string, unknown>;
-      return json(200, { ticketId: uuid });
+      return json(200, { id: uuid });
     },
   });
+  if (opts.listTickets !== false) {
+    routes.push({
+      method: "GET",
+      match: (u) => u.pathname === "/v1/tickets",
+      handler: () => json(200, { data: [{ id: uuid, number, displayNumber }], hasMore: false }),
+    });
+  }
   return { posted: () => posted };
 }
 
@@ -577,6 +598,61 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
       .bind(haloId)
       .first();
     expect(row).toBeNull();
+  });
+
+  it("resolves the real Gorelo ticket number and returns it in the /actions response", async () => {
+    const cap = captureGoreloCreate({
+      uuid: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a",
+      number: 264274883401817,
+      displayNumber: "T-100234",
+    });
+    const created = await req("/tickets", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ summary: "Printer down", details_html: reportHtml({ email: "user@corp.com" }) }]),
+    });
+    const haloId = ((await created.json()) as { id: number }).id;
+
+    const res = await req("/actions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ ticket_id: haloId, note_html: "note" }]),
+    });
+    expect(res.status).toBe(201);
+    expect(cap.posted()).toBeDefined(); // the deferred create fired
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    // The real number is read back from the create id via GET /v1/tickets.
+    expect(body[0]).toMatchObject({
+      ticket_id: haloId,
+      gorelo_ticket_id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a",
+      gorelo_ticket_number: 264274883401817,
+      gorelo_display_number: "T-100234",
+    });
+  });
+
+  it("still creates the ticket when the number read-back finds no match (best-effort)", async () => {
+    // GET /v1/tickets returns a page without the created id -> no number resolved.
+    const cap = captureGoreloCreate({ listTickets: false });
+    routes.push({
+      method: "GET",
+      match: (u) => u.pathname === "/v1/tickets",
+      handler: () => json(200, { data: [], hasMore: false }),
+    });
+    const created = await req("/tickets", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ summary: "help", details_html: reportHtml({ email: "user@corp.com" }) }]),
+    });
+    const haloId = ((await created.json()) as { id: number }).id;
+    const res = await req("/actions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ ticket_id: haloId, note_html: "note" }]),
+    });
+    expect(res.status).toBe(201);
+    expect(cap.posted()).toBeDefined(); // create succeeded despite the failed read-back
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    expect(body[0]).toMatchObject({ ticket_id: haloId, gorelo_ticket_number: null, gorelo_display_number: null });
   });
 
   it("surfaces the HDB report/remote links from the /actions note into the ticket", async () => {
@@ -921,7 +997,7 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
   });
 
   it("falls back to the catch-all client when the report resolves nothing", async () => {
-    const cap = captureGoreloCreate("00000000-0000-0000-0000-000000000000");
+    const cap = captureGoreloCreate({ uuid: "00000000-0000-0000-0000-000000000000" });
     const created = await req("/tickets", {
       method: "POST",
       headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
@@ -957,7 +1033,7 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
 
       // No contact match (catch-all fallback): email stays suppressed even with the flag on.
       routes = []; // drop the first capture so this create hits the new route
-      const miss = captureGoreloCreate("00000000-0000-0000-0000-000000000000");
+      const miss = captureGoreloCreate({ uuid: "00000000-0000-0000-0000-000000000000" });
       const c2 = await req("/tickets", {
         method: "POST",
         headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
@@ -976,7 +1052,7 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
   });
 
   it("orphan-flush creates a queued ticket whose note never arrived", async () => {
-    const cap = captureGoreloCreate("11111111-1111-1111-1111-111111111111");
+    const cap = captureGoreloCreate({ uuid: "11111111-1111-1111-1111-111111111111" });
     // Insert a pending row that is already past the grace window.
     const cmd = {
       title: "Orphaned",
@@ -1049,6 +1125,20 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
       // Nothing left queued.
       const row = await env.DB.prepare(`SELECT halo_id FROM pending_tickets`).first();
       expect(row).toBeNull();
+    });
+  });
+
+  it("surfaces the real Gorelo number in the immediate created-ticket response", async () => {
+    await withHuntressEnabled(async () => {
+      captureGoreloCreate({ uuid: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a", number: 900123, displayNumber: "T-900123" });
+      const res = await req(
+        "/api/Tickets",
+        huntressInit([{ summary: "Huntress Test", details: "x", client_id: "10" }]),
+      );
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as Record<string, unknown>;
+      // One-shot products create on this POST, so the real number is known now.
+      expect(body).toMatchObject({ gorelo_ticket_number: 900123, gorelo_display_number: "T-900123" });
     });
   });
 
