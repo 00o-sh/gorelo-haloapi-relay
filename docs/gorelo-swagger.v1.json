@@ -6,88 +6,32 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/v1/contacts": {
-      "get": {
-        "tags": [
-          "Contacts"
-        ],
-        "operationId": "crm-cluster_",
-        "parameters": [
-          {
-            "name": "ContactIds",
-            "in": "query",
-            "style": "form",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "clientid",
-            "in": "query",
-            "style": "form",
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
+    "/v1/alerts/": {
       "post": {
         "tags": [
-          "Contacts"
+          "Alerts"
         ],
-        "operationId": "crm-cluster_",
+        "operationId": "public-cluster_",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.CreatePublicContact.CreatePublicContactCommand"
+                "$ref": "#/components/schemas/public-cluster_PostAlertRequest"
               }
             },
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.CreatePublicContact.CreatePublicContactCommand"
+                "$ref": "#/components/schemas/public-cluster_PostAlertRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.CreatePublicContact.CreatePublicContactCommand"
+                "$ref": "#/components/schemas/public-cluster_PostAlertRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.CreatePublicContact.CreatePublicContactCommand"
+                "$ref": "#/components/schemas/public-cluster_PostAlertRequest"
               }
             }
           }
@@ -98,69 +42,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
+                  "type": "boolean"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
+                  "type": "boolean"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "Contacts"
-        ],
-        "operationId": "crm-cluster_",
-        "requestBody": {
-          "content": {
-            "application/json-patch+json": {
-              "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.UpdatePublicContact.UpdatePublicContactCommand"
-              }
-            },
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.UpdatePublicContact.UpdatePublicContactCommand"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.UpdatePublicContact.UpdatePublicContactCommand"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.UpdatePublicContact.UpdatePublicContactCommand"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
+                  "type": "boolean"
                 }
               }
             }
@@ -168,21 +60,29 @@
         }
       }
     },
-    "/v1/contacts/{id}": {
+    "/v1/assets/agents": {
       "get": {
         "tags": [
-          "Contacts"
+          "Assets"
         ],
-        "operationId": "crm-cluster_",
+        "operationId": "public-cluster_",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "style": "simple",
+            "name": "cursor",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "style": "form",
             "schema": {
               "type": "integer",
-              "format": "int64"
+              "format": "int32",
+              "default": 50
             }
           }
         ],
@@ -192,17 +92,59 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponsePagedResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponsePagedResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponsePagedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/agents/{id}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
                 }
               }
             }
@@ -215,33 +157,44 @@
         "tags": [
           "Clients"
         ],
-        "operationId": "crm-cluster_",
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponsePagedResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponsePagedResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponsePagedResponse"
                 }
               }
             }
@@ -252,27 +205,27 @@
         "tags": [
           "Clients"
         ],
-        "operationId": "crm-cluster_",
+        "operationId": "public-cluster_",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.CreatePublicClient.CreatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicClientCommand"
               }
             },
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.CreatePublicClient.CreatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicClientCommand"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.CreatePublicClient.CreatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicClientCommand"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.CreatePublicClient.CreatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicClientCommand"
               }
             }
           }
@@ -283,17 +236,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               }
             }
@@ -304,27 +257,27 @@
         "tags": [
           "Clients"
         ],
-        "operationId": "crm-cluster_",
+        "operationId": "public-cluster_",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.UpdatePublicClient.UpdatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicClientCommand"
               }
             },
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.UpdatePublicClient.UpdatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicClientCommand"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.UpdatePublicClient.UpdatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicClientCommand"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.UpdatePublicClient.UpdatePublicClientCommand"
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicClientCommand"
               }
             }
           }
@@ -335,17 +288,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               }
             }
@@ -358,7 +311,7 @@
         "tags": [
           "Clients"
         ],
-        "operationId": "crm-cluster_",
+        "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "id",
@@ -377,17 +330,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
                 }
               }
             }
@@ -400,7 +353,7 @@
         "tags": [
           "Clients"
         ],
-        "operationId": "crm-cluster_",
+        "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "clientId",
@@ -421,7 +374,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientLocationResponse"
+                    "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponse"
                   }
                 }
               },
@@ -429,7 +382,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientLocationResponse"
+                    "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponse"
                   }
                 }
               },
@@ -437,7 +390,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientLocationResponse"
+                    "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponse"
                   }
                 }
               }
@@ -446,59 +399,162 @@
         }
       }
     },
-    "/v1/alerts/": {
+    "/v1/contacts": {
+      "get": {
+        "tags": [
+          "Contacts"
+        ],
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponsePagedResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponsePagedResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponsePagedResponse"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
-          "Alerts"
+          "Contacts"
         ],
-        "operationId": "asset-cluster_",
+        "operationId": "public-cluster_",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/asset-cluster_Gorelo.Layers.Asset.Public.BLL.Commands.PostAlert.PostAlertCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicContactCommand"
               }
             },
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/asset-cluster_Gorelo.Layers.Asset.Public.BLL.Commands.PostAlert.PostAlertCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicContactCommand"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/asset-cluster_Gorelo.Layers.Asset.Public.BLL.Commands.PostAlert.PostAlertCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicContactCommand"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/asset-cluster_Gorelo.Layers.Asset.Public.BLL.Commands.PostAlert.PostAlertCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicContactCommand"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              }
+            }
           }
         }
-      }
-    },
-    "/v1/assets/agents": {
-      "get": {
+      },
+      "patch": {
         "tags": [
-          "Assets"
+          "Contacts"
         ],
-        "operationId": "asset-cluster_",
+        "operationId": "public-cluster_",
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicContactCommand"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicContactCommand"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicContactCommand"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_UpdatePublicContactCommand"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/asset-cluster_Gorelo.Layers.Asset.Public.BLL.Models.PublicDeviceResponse"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
                 }
               }
             }
@@ -506,12 +562,12 @@
         }
       }
     },
-    "/v1/assets/agents/{id}": {
+    "/v1/contacts/{id}": {
       "get": {
         "tags": [
-          "Assets"
+          "Contacts"
         ],
-        "operationId": "asset-cluster_",
+        "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "id",
@@ -519,8 +575,8 @@
             "required": true,
             "style": "simple",
             "schema": {
-              "type": "string",
-              "format": "uuid"
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
@@ -528,9 +584,108 @@
           "200": {
             "description": "OK",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/asset-cluster_Gorelo.Layers.Asset.Public.BLL.Models.PublicDeviceResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organization/users": {
+      "get": {
+        "tags": [
+          "Organization"
+        ],
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicUserModelPagedResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicUserModelPagedResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicUserModelPagedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organization/groups": {
+      "get": {
+        "tags": [
+          "Organization"
+        ],
+        "operationId": "public-cluster_",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/public-cluster_PublicGroupModel"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/public-cluster_PublicGroupModel"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/public-cluster_PublicGroupModel"
+                  }
                 }
               }
             }
@@ -543,27 +698,27 @@
         "tags": [
           "Tickets"
         ],
-        "operationId": "ticket-cluster_",
+        "operationId": "public-cluster_",
         "requestBody": {
           "content": {
             "application/json-patch+json": {
               "schema": {
-                "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicTicketCommand"
               }
             },
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicTicketCommand"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicTicketCommand"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketCommand"
+                "$ref": "#/components/schemas/public-cluster_CreatePublicTicketCommand"
               }
             }
           }
@@ -574,17 +729,83 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketResult"
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketResult"
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketResult"
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResult"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "default": "updatedOn"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelPagedResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelPagedResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelPagedResponse"
                 }
               }
             }
@@ -597,7 +818,7 @@
         "tags": [
           "Tickets"
         ],
-        "operationId": "ticket-cluster_",
+        "operationId": "public-cluster_",
         "responses": {
           "200": {
             "description": "OK",
@@ -606,7 +827,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicStatusListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModel"
                   }
                 }
               },
@@ -614,7 +835,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicStatusListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModel"
                   }
                 }
               },
@@ -622,7 +843,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicStatusListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModel"
                   }
                 }
               }
@@ -636,7 +857,7 @@
         "tags": [
           "Tickets"
         ],
-        "operationId": "ticket-cluster_",
+        "operationId": "public-cluster_",
         "responses": {
           "200": {
             "description": "OK",
@@ -645,7 +866,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTagListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicTagListItemModel"
                   }
                 }
               },
@@ -653,7 +874,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTagListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicTagListItemModel"
                   }
                 }
               },
@@ -661,7 +882,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTagListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicTagListItemModel"
                   }
                 }
               }
@@ -675,7 +896,7 @@
         "tags": [
           "Tickets"
         ],
-        "operationId": "ticket-cluster_",
+        "operationId": "public-cluster_",
         "responses": {
           "200": {
             "description": "OK",
@@ -684,7 +905,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTypeListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModel"
                   }
                 }
               },
@@ -692,7 +913,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTypeListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModel"
                   }
                 }
               },
@@ -700,7 +921,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTypeListItemModel"
+                    "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModel"
                   }
                 }
               }
@@ -708,37 +929,21 @@
           }
         }
       }
-    },
-    "/v1/organization/users": {
-      "get": {
-        "tags": [
-          "Organization"
-        ],
-        "operationId": "serviceprovider-cluster_",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/v1/organization/groups": {
-      "get": {
-        "tags": [
-          "Organization"
-        ],
-        "operationId": "serviceprovider-cluster_",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
     }
   },
   "components": {
     "schemas": {
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.CreatePublicClient.CreatePublicClientCommand": {
+      "public-cluster_AlertLevel": {
+        "enum": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "public-cluster_CreatePublicClientCommand": {
         "type": "object",
         "properties": {
           "name": {
@@ -758,39 +963,235 @@
             "nullable": true
           },
           "location": {
-            "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientLocationRequest"
+            "$ref": "#/components/schemas/public-cluster_PublicClientLocationRequest"
           }
         },
         "additionalProperties": false
       },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Commands.UpdatePublicClient.UpdatePublicClientCommand": {
+      "public-cluster_CreatePublicContactCommand": {
         "type": "object",
         "properties": {
-          "id": {
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientId": {
             "type": "integer",
             "format": "int64"
           },
-          "name": {
+          "clientLocationId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "primaryEmail": {
             "type": "string",
+            "nullable": true
+          },
+          "secondaryEmail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "mobilePhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "mobilePhoneCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "officePhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "officePhoneCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeZone": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_CreatePublicTicketCommand": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "locationId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "contactId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "ccContactIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
             "nullable": true
           },
           "statusId": {
             "type": "integer",
-            "format": "int32",
+            "format": "int64",
             "nullable": true
           },
-          "billingName": {
+          "groupId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": {
             "type": "string",
             "nullable": true
           },
-          "alternateName": {
+          "priorityId": {
+            "$ref": "#/components/schemas/public-cluster_PublicTicketPriority"
+          },
+          "sourceId": {
+            "$ref": "#/components/schemas/public-cluster_TicketSource"
+          },
+          "typeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leadAssigneeId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "assistingAssigneeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "watcherIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "agentAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "customAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "uptimeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "sendTicketCreatedEmail": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "isUnread": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_CreatePublicTicketResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PostAlertRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resource": {
+            "type": "string",
+            "nullable": true
+          },
+          "severity": {
+            "$ref": "#/components/schemas/public-cluster_AlertLevel"
+          },
+          "description": {
             "type": "string",
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientLocationRequest": {
+      "public-cluster_PublicClientLocationRequest": {
         "type": "object",
         "properties": {
           "name": {
@@ -840,7 +1241,7 @@
         },
         "additionalProperties": false
       },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientLocationResponse": {
+      "public-cluster_PublicClientLocationResponse": {
         "type": "object",
         "properties": {
           "id": {
@@ -935,7 +1336,7 @@
         },
         "additionalProperties": false
       },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientResponse": {
+      "public-cluster_PublicClientResponse": {
         "type": "object",
         "properties": {
           "id": {
@@ -946,10 +1347,8 @@
             "type": "string",
             "nullable": true
           },
-          "statusId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
+          "status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
           "createdOn": {
             "type": "string",
@@ -976,14 +1375,45 @@
           "domains": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientWebDomainResponse"
+              "$ref": "#/components/schemas/public-cluster_PublicClientWebDomainResponse"
             },
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Client.Models.PublicClientWebDomainResponse": {
+      "public-cluster_PublicClientResponsePagedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "previousCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicClientWebDomainResponse": {
         "type": "object",
         "properties": {
           "id": {
@@ -992,11 +1422,6 @@
           },
           "name": {
             "type": "string",
-            "nullable": true
-          },
-          "statusId": {
-            "type": "integer",
-            "format": "int64",
             "nullable": true
           },
           "createdOn": {
@@ -1016,147 +1441,29 @@
           },
           "isDateSetManually": {
             "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.CreatePublicContact.CreatePublicContactCommand": {
-        "type": "object",
-        "properties": {
-          "firstName": {
-            "type": "string",
-            "nullable": true
           },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "clientId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "clientLocationId": {
+          "statusId": {
             "type": "integer",
             "format": "int64",
             "nullable": true
-          },
-          "primaryEmail": {
-            "type": "string",
-            "nullable": true
-          },
-          "secondaryEmail": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "mobilePhone": {
-            "type": "string",
-            "nullable": true
-          },
-          "mobilePhoneCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "officePhone": {
-            "type": "string",
-            "nullable": true
-          },
-          "officePhoneCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "jobTitle": {
-            "type": "string",
-            "nullable": true
-          },
-          "department": {
-            "type": "string",
-            "nullable": true
-          },
-          "timeZone": {
-            "type": "string",
-            "nullable": true
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Commands.UpdatePublicContact.UpdatePublicContactCommand": {
+      "public-cluster_PublicCodeModel": {
         "type": "object",
         "properties": {
-          "contactId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "firstName": {
-            "type": "string",
+          "id": {
             "nullable": true
           },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "clientId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "clientLocationId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "primaryEmail": {
-            "type": "string",
-            "nullable": true
-          },
-          "secondaryEmail": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "nullable": true
-          },
-          "mobilePhone": {
-            "type": "string",
-            "nullable": true
-          },
-          "mobilePhoneCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "officePhone": {
-            "type": "string",
-            "nullable": true
-          },
-          "officePhoneCountryCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "jobTitle": {
-            "type": "string",
-            "nullable": true
-          },
-          "department": {
-            "type": "string",
-            "nullable": true
-          },
-          "timeZone": {
-            "type": "string",
-            "nullable": true
-          },
-          "description": {
+          "name": {
             "type": "string",
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "crm-cluster_Gorelo.Layers.CRM.Public.BLL.Contact.Models.PublicContactResponse": {
+      "public-cluster_PublicContactResponse": {
         "type": "object",
         "properties": {
           "id": {
@@ -1171,10 +1478,8 @@
             "type": "string",
             "nullable": true
           },
-          "statusId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
+          "status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
           "clientId": {
             "type": "integer",
@@ -1247,47 +1552,38 @@
         },
         "additionalProperties": false
       },
-      "asset-cluster_Gorelo.CosmosManager.Models.Asset.AlertLevel": {
-        "enum": [
-          1,
-          2,
-          3,
-          4
-        ],
-        "type": "integer",
-        "format": "int32"
-      },
-      "asset-cluster_Gorelo.Layers.Asset.Public.BLL.Commands.PostAlert.PostAlertCommand": {
+      "public-cluster_PublicContactResponsePagedResponse": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+            },
             "nullable": true
           },
-          "clientId": {
+          "totalCount": {
             "type": "integer",
-            "format": "int64"
+            "format": "int32"
           },
-          "resource": {
+          "nextCursor": {
             "type": "string",
             "nullable": true
           },
-          "severity": {
-            "$ref": "#/components/schemas/asset-cluster_Gorelo.CosmosManager.Models.Asset.AlertLevel"
-          },
-          "description": {
+          "previousCursor": {
             "type": "string",
             "nullable": true
           },
-          "type": {
-            "type": "string",
-            "nullable": true,
-            "readOnly": true
+          "hasMore": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
       },
-      "asset-cluster_Gorelo.Layers.Asset.Public.BLL.Models.PublicDeviceResponse": {
+      "public-cluster_PublicDeviceResponse": {
         "type": "object",
         "properties": {
           "id": {
@@ -1298,9 +1594,8 @@
             "type": "string",
             "nullable": true
           },
-          "statusId": {
-            "type": "integer",
-            "format": "int32"
+          "status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
           "clientId": {
             "type": "integer",
@@ -1440,162 +1735,108 @@
         },
         "additionalProperties": false
       },
-      "ticket-cluster_Gorelo.Layers.Tickets.BLL.PublicTicketPriority": {
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4
-        ],
-        "type": "integer",
-        "format": "int32"
-      },
-      "ticket-cluster_Gorelo.Layers.Tickets.BLL.TicketSource": {
-        "enum": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6
-        ],
-        "type": "integer",
-        "format": "int32"
-      },
-      "ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketCommand": {
+      "public-cluster_PublicDeviceResponsePagedResponse": {
         "type": "object",
         "properties": {
-          "title": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdByName": {
-            "type": "string",
-            "nullable": true
-          },
-          "clientId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "locationId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "contactId": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "ccContactIds": {
+          "data": {
             "type": "array",
             "items": {
-              "type": "integer",
-              "format": "int64"
+              "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
             },
             "nullable": true
           },
-          "statusId": {
+          "totalCount": {
             "type": "integer",
-            "format": "int64",
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": "string",
             "nullable": true
           },
-          "groupId": {
+          "previousCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicGroupModel": {
+        "type": "object",
+        "properties": {
+          "id": {
             "type": "integer",
             "format": "int64"
           },
-          "description": {
+          "name": {
             "type": "string",
             "nullable": true
           },
-          "priorityId": {
-            "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.BLL.PublicTicketPriority"
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
           },
-          "sourceId": {
-            "$ref": "#/components/schemas/ticket-cluster_Gorelo.Layers.Tickets.BLL.TicketSource"
-          },
-          "typeId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "leadAssigneeId": {
-            "type": "integer",
-            "format": "int64",
+          "updatedOn": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
-          "assistingAssigneeIds": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            },
+          "alias": {
+            "type": "string",
             "nullable": true
           },
-          "watcherIds": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "nullable": true
-          },
-          "tagIds": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "nullable": true
-          },
-          "agentAssetIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "nullable": true
-          },
-          "customAssetIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "nullable": true
-          },
-          "uptimeIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "nullable": true
-          },
-          "sendTicketCreatedEmail": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "isUnread": {
-            "type": "boolean",
+          "outboundEmail": {
+            "type": "string",
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Commands.CreatePublicTicket.CreatePublicTicketResult": {
+      "public-cluster_PublicLastUpdateModel": {
         "type": "object",
         "properties": {
-          "ticketId": {
+          "updateType": {
             "type": "string",
-            "format": "uuid",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "on": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           }
         },
         "additionalProperties": false
       },
-      "ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicStatusListItemModel": {
+      "public-cluster_PublicSlaFirstResponseModel": {
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicSlaModel": {
+        "type": "object",
+        "properties": {
+          "firstResponse": {
+            "$ref": "#/components/schemas/public-cluster_PublicSlaFirstResponseModel"
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicStatusListItemModel": {
         "type": "object",
         "properties": {
           "id": {
@@ -1637,7 +1878,7 @@
         },
         "additionalProperties": false
       },
-      "ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTagListItemModel": {
+      "public-cluster_PublicTagListItemModel": {
         "type": "object",
         "properties": {
           "id": {
@@ -1668,7 +1909,201 @@
         },
         "additionalProperties": false
       },
-      "ticket-cluster_Gorelo.Layers.Tickets.Public.BLL.Models.PublicTypeListItemModel": {
+      "public-cluster_PublicTicketListItemModel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "displayNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "clientLocationId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "contactId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "ccContactIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "leadAssigneeId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "assistingAssigneeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "watcherIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "groupIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "primaryGroupId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "statusUpdatedOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "statusReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "source": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "type": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "isUnread": {
+            "type": "boolean"
+          },
+          "isAwaitingClient": {
+            "type": "boolean"
+          },
+          "isMerged": {
+            "type": "boolean"
+          },
+          "mergedIntoTicketId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "mergedTicketIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "nullable": true
+          },
+          "sla": {
+            "$ref": "#/components/schemas/public-cluster_PublicSlaModel"
+          },
+          "lastUpdate": {
+            "$ref": "#/components/schemas/public-cluster_PublicLastUpdateModel"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closedOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicTicketListItemModelPagedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModel"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "previousCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicTicketPriority": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "public-cluster_PublicTypeListItemModel": {
         "type": "object",
         "properties": {
           "id": {
@@ -1698,6 +2133,184 @@
           }
         },
         "additionalProperties": false
+      },
+      "public-cluster_PublicUserModel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeZone": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicUserModelPagedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicUserModel"
+            },
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "previousCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_TicketSource": {
+        "enum": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "public-cluster_UpdatePublicClientCommand": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "statusId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "billingName": {
+            "type": "string",
+            "nullable": true
+          },
+          "alternateName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_UpdatePublicContactCommand": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "clientId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clientLocationId": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "primaryEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "secondaryEmail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "mobilePhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "mobilePhoneCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "officePhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "officePhoneCountryCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "jobTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "department": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeZone": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       }
     },
     "securitySchemes": {
@@ -1711,18 +2324,10 @@
   },
   "security": [
     {
-      "ApiKeyAuth": [ ]
+      "ApiKeyAuth": []
     }
   ],
   "tags": [
-    {
-      "name": "Contacts",
-      "description": "Contacts management operations"
-    },
-    {
-      "name": "Clients",
-      "description": "Clients management operations"
-    },
     {
       "name": "Alerts",
       "description": "Alerts management operations"
@@ -1732,12 +2337,20 @@
       "description": "Assets management operations"
     },
     {
-      "name": "Tickets",
-      "description": "Tickets management operations"
+      "name": "Clients",
+      "description": "Clients management operations"
+    },
+    {
+      "name": "Contacts",
+      "description": "Contacts management operations"
     },
     {
       "name": "Organization",
       "description": "Organization management operations"
+    },
+    {
+      "name": "Tickets",
+      "description": "Tickets management operations"
     }
   ]
 }
