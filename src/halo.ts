@@ -972,9 +972,30 @@ function buildTicketCommand(
  * id we return, and let the /actions note fold in before the create. An orphan
  * flush (cron + opportunistic) creates any ticket whose note never arrives.
  */
-/** Echo a Halo-shaped created ticket (the 201 Faults object) so the caller can correlate. */
-function haloCreatedTicket(env: Env, haloId: number, cmd: CreatePublicTicketCommand, t: HaloTicket, routing: Routing): Response {
-  return jsonResponse(201, {
+/** The human-facing Gorelo ticket number, read back from the create GUID. */
+type TicketNumber = { number: number | null; displayNumber: string | null } | null;
+
+/** True when the resolved number actually carries a value worth surfacing. */
+function hasNumber(n: TicketNumber): n is { number: number | null; displayNumber: string | null } {
+  return n != null && (n.number != null || n.displayNumber != null);
+}
+
+/**
+ * Echo a Halo-shaped created ticket (the 201 Faults object) so the caller can
+ * correlate. When the real Gorelo number has been resolved (one-shot products,
+ * where the create happens here), surface it as `gorelo_ticket_number` /
+ * `gorelo_display_number` so the client can show the real number instead of the
+ * synthetic `id`. Deferred (Tier2) creates resolve the number at /actions instead.
+ */
+function haloCreatedTicket(
+  env: Env,
+  haloId: number,
+  cmd: CreatePublicTicketCommand,
+  t: HaloTicket,
+  routing: Routing,
+  number: TicketNumber = null,
+): Response {
+  const body: Record<string, unknown> = {
     id: haloId,
     summary: cmd.title,
     details: str(t.details),
@@ -983,7 +1004,17 @@ function haloCreatedTicket(env: Env, haloId: number, cmd: CreatePublicTicketComm
     user_id: routing.contactId ?? 0,
     tickettype_id: Number(env.DEFAULT_TYPE_ID),
     status_id: Number(env.DEFAULT_STATUS_ID),
-  });
+  };
+  if (hasNumber(number)) {
+    body.gorelo_ticket_number = number.number;
+    body.gorelo_display_number = number.displayNumber;
+  }
+  return jsonResponse(201, body);
+}
+
+/** Compact "number=..." fragment for a create breadcrumb. */
+function numberTag(n: TicketNumber): string {
+  return `number=${hasNumber(n) ? (n.displayNumber ?? n.number) : "?"}`;
 }
 
 async function handleCreateTicket(
@@ -1002,12 +1033,17 @@ async function handleCreateTicket(
   // the Gorelo ticket immediately. On failure, fall back to the pending queue so the
   // orphan flush retries it (same resilience as the deferred path below).
   if (product && !product.deferCreate) {
+    let number: TicketNumber = null;
     try {
-      const raw = await new GoreloClient(env).createTicket(cmd);
+      const client = new GoreloClient(env);
+      const raw = await client.createTicket(cmd);
       const uuid = extractTicketNumber(raw) ?? "";
+      // Read the human ticket number back from the create GUID (best-effort).
+      number = await client.resolveTicketNumber(uuid);
       breadcrumb(
         `HALO created gorelo ticket ${uuid} immediately (product=${product.key} halo_id=${haloId} ` +
-          `client=${routing.clientId} contact=${routing.contactId} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
+          `client=${routing.clientId} contact=${routing.contactId} ${numberTag(number)} ` +
+          `email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
       );
     } catch (err) {
       await putPendingTicket(env.DB, haloId, JSON.stringify(cmd), nowIso());
@@ -1015,7 +1051,7 @@ async function handleCreateTicket(
         `HALO immediate create failed (product=${product.key} halo_id=${haloId}), queued for retry: ${describeError(err)}`,
       );
     }
-    return haloCreatedTicket(env, haloId, cmd, t, routing);
+    return haloCreatedTicket(env, haloId, cmd, t, routing, number);
   }
 
   // Tier2 two-step flow: DON'T create yet. Queue the command keyed by the Halo id we
@@ -1096,13 +1132,25 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
   }
 
   try {
-    const raw = await new GoreloClient(env).createTicket(cmd);
+    const client = new GoreloClient(env);
+    const raw = await client.createTicket(cmd);
     const uuid = extractTicketNumber(raw) ?? "";
+    // The deferred Gorelo ticket now exists — this is the earliest the real
+    // number is knowable, so read it back and hand it to Tier2 in the response.
+    const number = await client.resolveTicketNumber(uuid);
     breadcrumb(
       `HALO created gorelo ticket ${uuid} from action (halo_id=${haloId} client=${cmd.clientId} ` +
-        `contact=${cmd.contactId} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
+        `contact=${cmd.contactId} ${numberTag(number)} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
     );
-    return jsonResponse(201, [{ id: actionId, ticket_id: haloId, gorelo_ticket_id: uuid }]);
+    return jsonResponse(201, [
+      {
+        id: actionId,
+        ticket_id: haloId,
+        gorelo_ticket_id: uuid,
+        gorelo_ticket_number: number?.number ?? null,
+        gorelo_display_number: number?.displayNumber ?? null,
+      },
+    ]);
   } catch (err) {
     // Re-queue so the orphan flush retries — unless we've exhausted attempts, in
     // which case dead-letter it (drop + log) so a bad command can't loop forever.
@@ -1240,10 +1288,11 @@ export async function flushPendingTickets(env: Env): Promise<number> {
       const cmd = JSON.parse(row.command) as CreatePublicTicketCommand;
       const raw = await client.createTicket(cmd);
       const uuid = extractTicketNumber(raw) ?? "";
+      const number = await client.resolveTicketNumber(uuid);
       created++;
       breadcrumb(
         `HALO orphan-flush created gorelo ticket ${uuid} (halo_id=${row.halo_id} ` +
-          `contact=${cmd.contactId} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
+          `contact=${cmd.contactId} ${numberTag(number)} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
       );
     } catch (err) {
       const attempts = row.attempts + 1;
