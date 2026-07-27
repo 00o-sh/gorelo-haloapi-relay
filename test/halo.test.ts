@@ -1079,6 +1079,50 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     const row = await env.DB.prepare(`SELECT halo_id FROM pending_tickets WHERE halo_id = 4242`).first();
     expect(row).toBeNull();
   });
+
+  // Seed `n` stale pending orphans (created well before the grace window).
+  async function seedOrphans(n: number, from = 1): Promise<void> {
+    const stmts = Array.from({ length: n }, (_, i) => {
+      const id = from + i;
+      const cmd = { title: `Orphan ${id}`, clientId: 10, statusId: 1, groupId: 7, typeId: 3, priorityId: 2, sourceId: 6, agentAssetIds: [] };
+      return env.DB
+        .prepare(`INSERT INTO pending_tickets (halo_id, command, created_at, attempts) VALUES (?,?,?,0)`)
+        .bind(id, JSON.stringify(cmd), "2000-01-01T00:00:00Z");
+    });
+    await env.DB.batch(stmts);
+  }
+
+  it("attempts each failing orphan at most once per run (no same-run retry storm)", async () => {
+    // Gorelo create always fails: each orphan should be tried exactly once and
+    // re-queued at attempt 1 — NOT retried again this run (which would burn all
+    // attempts and dead-letter good tickets during an outage).
+    let creates = 0;
+    routes.push({
+      method: "POST",
+      match: (u) => u.pathname === "/v1/tickets",
+      handler: () => {
+        creates++;
+        return json(500, { error: "boom" });
+      },
+    });
+    await seedOrphans(3);
+
+    const n = await flushPendingTickets(env);
+    expect(n).toBe(0); // none created
+    expect(creates).toBe(3); // each orphan tried exactly once, not repeatedly
+    const rows = await env.DB.prepare(`SELECT attempts FROM pending_tickets ORDER BY halo_id`).all<{ attempts: number }>();
+    expect(rows.results?.map((r) => r.attempts)).toEqual([1, 1, 1]); // all re-queued at attempt 1
+  });
+
+  it("processes at most `limit` orphans per run, leaving the rest queued", async () => {
+    captureGoreloCreate(); // Gorelo create succeeds
+    await seedOrphans(8);
+
+    const n = await flushPendingTickets(env, 5);
+    expect(n).toBe(5);
+    const remaining = await env.DB.prepare(`SELECT COUNT(*) AS c FROM pending_tickets`).first<{ c: number }>();
+    expect(remaining?.c).toBe(3); // the cron flush drains the remainder later
+  });
 });
 
 describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
