@@ -219,6 +219,40 @@ describe("syncAll delta reconcile (inline tables + location fan-out)", () => {
     expect(await count("devices")).toBe(0);
   });
 
+  it("follows cursor pagination on the bulk list endpoints (all pages land in the mirror)", async () => {
+    // Gorelo's 2026-07-24 change: /v1/contacts et al. return { data, nextCursor,
+    // hasMore } and page at 50, so the sync must follow the cursor to get every row.
+    const contactsByCursor: Record<string, unknown> = {
+      "": {
+        data: [
+          { id: 1, primaryEmail: "a@corp.com", firstName: "A", lastName: "A", clientId: 10, clientLocationId: 100 },
+          { id: 2, primaryEmail: "b@corp.com", firstName: "B", lastName: "B", clientId: 10, clientLocationId: 100 },
+        ],
+        nextCursor: "page2",
+        hasMore: true,
+      },
+      page2: {
+        data: [
+          { id: 3, primaryEmail: "c@corp.com", firstName: "C", lastName: "C", clientId: 10, clientLocationId: 100 },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      },
+    };
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = new URL(new Request(input as RequestInfo, init).url);
+      const p = url.pathname;
+      if (p === "/v1/assets/agents") return json({ data: [], nextCursor: null, hasMore: false });
+      if (p === "/v1/clients") return json({ data: [{ id: 10, name: "Corp" }], nextCursor: null, hasMore: false });
+      if (p === "/v1/contacts") return json(contactsByCursor[url.searchParams.get("cursor") ?? ""]);
+      throw new Error(`unmocked fetch: ${p}`);
+    }) as typeof fetch;
+
+    const r = await syncAll(makeQueue().env);
+    expect(r.contacts).toBe(3); // both pages reconciled, not just the first
+    expect(await count("contacts")).toBe(3);
+  });
+
   it("drops locations of a client that vanished upstream (inline, D1-only)", async () => {
     // Seed two clients' locations via the consumer, then remove client 20.
     data.clients.push({ id: 20, name: "NewCo" });

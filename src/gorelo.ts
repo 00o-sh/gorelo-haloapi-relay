@@ -1,3 +1,4 @@
+import { breadcrumb } from "./log.js";
 import type {
   CreatePublicTicketCommand,
   Env,
@@ -103,13 +104,46 @@ export class GoreloClient {
   }
 
   /**
-   * GET /v1/assets/agents — the whole agent fleet.
-   * CONFIRMED (swagger): returns a bare array with no query params / pagination.
-   * asArray still tolerates an envelope defensively.
+   * Fetch every record from a cursor-paginated list endpoint (Gorelo's 2026-07-24
+   * API change: `/v1/assets/agents`, `/v1/clients`, `/v1/contacts` now return a
+   * `{ data, nextCursor, hasMore }` envelope and default to 50 rows/page, so a
+   * single GET no longer returns the whole set). Requests a large page to keep the
+   * page count (and thus subrequests, bounded by the Worker's ~50/invocation cap)
+   * low, then follows `nextCursor` until drained. Still tolerates a bare array /
+   * `{items|results|value}` shape for endpoints that haven't been paginated.
+   * `maxPages` is a runaway guard; hitting it is logged, never silent.
+   */
+  private async getAllPages<T>(path: string, pageSize = 200, maxPages = 25): Promise<T[]> {
+    const out: T[] = [];
+    let cursor: string | null = null;
+    const sep = path.includes("?") ? "&" : "?";
+    for (let page = 1; page <= maxPages; page++) {
+      const qs = new URLSearchParams({ pageSize: String(pageSize) });
+      if (cursor) qs.set("cursor", cursor);
+      const raw = await this.getJsonWithRetry<unknown>(`${path}${sep}${qs.toString()}`);
+      if (Array.isArray(raw)) {
+        out.push(...(raw as T[])); // not (yet) paginated — bare array
+        return out;
+      }
+      const env = (raw ?? {}) as { data?: unknown; nextCursor?: string | null; hasMore?: boolean };
+      const items = Array.isArray(env.data) ? (env.data as T[]) : asArray<T>(raw);
+      out.push(...items);
+      cursor = env.nextCursor ?? null;
+      const more = env.hasMore ?? (cursor != null && items.length > 0);
+      if (!more || !cursor) return out;
+      if (page === maxPages) {
+        breadcrumb(`Gorelo paged ${path}: stopped at ${maxPages} pages (${out.length} rows) with more remaining`);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * GET /v1/assets/agents — the whole agent fleet. Cursor-paginated since
+   * 2026-07-24 (was a bare array); getAllPages follows the cursor to fetch all.
    */
   async listAgents(): Promise<PublicDeviceResponse[]> {
-    const raw = await this.getJsonWithRetry<unknown>("/v1/assets/agents");
-    return asArray<PublicDeviceResponse>(raw);
+    return this.getAllPages<PublicDeviceResponse>("/v1/assets/agents");
   }
 
   /**
@@ -126,21 +160,19 @@ export class GoreloClient {
     }
   }
 
-  /** GET /v1/clients — all clients + their domains (no query params). */
+  /** GET /v1/clients — all clients + their domains. Cursor-paginated since 2026-07-24. */
   async listClients(): Promise<PublicClientResponse[]> {
-    const raw = await this.getJsonWithRetry<unknown>("/v1/clients");
-    return asArray<PublicClientResponse>(raw);
+    return this.getAllPages<PublicClientResponse>("/v1/clients");
   }
 
   /**
-   * GET /v1/contacts — ALL contacts in one call (the `clientid` filter is
-   * optional; each row carries its own clientId/clientLocationId). The sync uses
-   * this instead of one call per client, collapsing N per-client fetches into a
-   * single subrequest to stay under the Worker's per-invocation subrequest cap.
+   * GET /v1/contacts — ALL contacts (the `clientId` filter is optional; each row
+   * carries its own clientId/clientLocationId). The sync uses this instead of one
+   * call per client. Cursor-paginated since 2026-07-24, so getAllPages follows the
+   * cursor across pages (a large page size keeps the page/subrequest count low).
    */
   async listAllContacts(): Promise<PublicContactResponse[]> {
-    const raw = await this.getJsonWithRetry<unknown>("/v1/contacts");
-    return asArray<PublicContactResponse>(raw);
+    return this.getAllPages<PublicContactResponse>("/v1/contacts");
   }
 
   /** GET /v1/clients/{clientId}/locations — sites for one client. */
