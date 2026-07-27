@@ -1064,7 +1064,13 @@ async function handleCreateTicket(
   );
 
   // Opportunistically flush older orphans in the background (no-op when empty).
-  ctx?.waitUntil(flushPendingTickets(env).catch((e) => breadcrumb(`HALO opportunistic flush failed ${describeError(e)}`)));
+  // Small cap: this runs in the request's waitUntil, so keep it short enough to
+  // finish before the post-response time budget (the cron flush drains the rest).
+  ctx?.waitUntil(
+    flushPendingTickets(env, OPPORTUNISTIC_FLUSH_LIMIT).catch((e) =>
+      breadcrumb(`HALO opportunistic flush failed ${describeError(e)}`),
+    ),
+  );
 
   return haloCreatedTicket(env, haloId, cmd, t, routing);
 }
@@ -1273,26 +1279,42 @@ export async function testNotifly(
   return { configured: true, results };
 }
 
+// How many orphans one flush invocation will process. The cron flush (large,
+// off-request budget) uses the default; the opportunistic flush fired in a
+// request's waitUntil uses the smaller cap so the background task stays short and
+// isn't cancelled mid-run when it exceeds the post-response time budget.
+const CRON_FLUSH_LIMIT = 50;
+export const OPPORTUNISTIC_FLUSH_LIMIT = 5;
+
 /**
  * Create any queued tickets whose /actions note never arrived (older than the
  * grace window). Runs from the cron and opportunistically off live requests.
+ *
+ * Claims ONE orphan at a time (an atomic delete-and-return) rather than a whole
+ * batch up front: if the caller's waitUntil budget runs out and the task is
+ * cancelled, at most the single in-flight ticket is at risk — never a batch of
+ * pre-claimed rows that would otherwise be dropped (deleted from the queue but
+ * never created). A failed create is re-queued with a FRESH created_at so it
+ * falls back outside the grace window and is NOT re-claimed again in this same
+ * run (which, during a Gorelo outage, would burn all its attempts and dead-letter
+ * a good ticket in one pass); it becomes eligible again after the grace window —
+ * a natural retry backoff. `attempts` still drives dead-lettering.
  */
-export async function flushPendingTickets(env: Env): Promise<number> {
+export async function flushPendingTickets(env: Env, limit = CRON_FLUSH_LIMIT): Promise<number> {
   const cutoff = new Date(Date.now() - PENDING_GRACE_MS).toISOString();
-  const stale = await takeStalePendingTickets(env.DB, cutoff);
-  if (!stale.length) return 0;
   const client = new GoreloClient(env);
   let created = 0;
-  for (const row of stale) {
+  for (let i = 0; i < limit; i++) {
+    const [row] = await takeStalePendingTickets(env.DB, cutoff, 1);
+    if (!row) break; // queue drained
     try {
       const cmd = JSON.parse(row.command) as CreatePublicTicketCommand;
       const raw = await client.createTicket(cmd);
       const uuid = extractTicketNumber(raw) ?? "";
-      const number = await client.resolveTicketNumber(uuid);
       created++;
       breadcrumb(
         `HALO orphan-flush created gorelo ticket ${uuid} (halo_id=${row.halo_id} ` +
-          `contact=${cmd.contactId} ${numberTag(number)} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
+          `contact=${cmd.contactId} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
       );
     } catch (err) {
       const attempts = row.attempts + 1;
@@ -1305,7 +1327,10 @@ export async function flushPendingTickets(env: Env): Promise<number> {
           error: String(err),
         });
       } else {
-        await putPendingTicket(env.DB, row.halo_id, row.command, row.created_at, attempts);
+        // Fresh created_at: keeps this failing orphan out of the current run's
+        // remaining claims (no same-run retry storm) and backs its next attempt
+        // off by the grace window.
+        await putPendingTicket(env.DB, row.halo_id, row.command, nowIso(), attempts);
         breadcrumb(`HALO orphan-flush failed halo_id=${row.halo_id} (attempt ${attempts}): ${describeError(err)}`);
       }
     }

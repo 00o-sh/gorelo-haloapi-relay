@@ -168,7 +168,11 @@ list endpoints use the `*_View` **paging envelope** (`page_no`/`page_size`/`reco
   the command in `pending_tickets` and the `/actions` note creates the single Gorelo
   ticket. A press whose note never arrives is created by an orphan flush (the
   `*/5 * * * *` cron, plus an opportunistic sweep off live requests) after
-  `PENDING_GRACE_MS`.
+  `PENDING_GRACE_MS`. The flush claims one orphan at a time and bounds how many it
+  processes per run (a small cap on the request-path sweep, larger on the cron), so
+  the request's `waitUntil` task can't overrun its budget and drop a pre-claimed
+  batch; a failed create is re-queued with a fresh timestamp and retried a grace
+  window later.
 - **Immediate (Huntress, `deferCreate: false`):** the whole ticket arrives in the one
   POST and there's no follow-up note, so the Gorelo ticket is created **right away**
   (falling back to the pending queue if that call fails, so the orphan flush retries).
