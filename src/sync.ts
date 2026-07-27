@@ -9,10 +9,16 @@ import type {
   PublicDeviceResponse,
 } from "./types.js";
 
-// D1 caps a batch's total bound parameters (~variable limit); the widest row
-// (devices, 10 cols) at 200/batch stays well under it. Larger chunks mean fewer
-// batches = fewer subrequests per sync — the fleet writes fit the invocation cap.
+// Insert batches are lists of SINGLE-ROW prepared statements, so D1's per-query
+// bound-parameter cap applies to each row (≤10 vars for the widest, devices), not
+// the batch — 200/batch is safe and means fewer subrequests per sync.
 const INSERT_CHUNK = 200;
+
+// A `DELETE ... WHERE key IN (?, ?, …)` binds every id in ONE statement, so it IS
+// subject to D1's ~100-bound-parameter-per-query limit. Chunk stale-delete id lists
+// well under that cap (a sync deleting >100 rows in a table otherwise throws
+// "D1_ERROR: too many SQL variables").
+const DELETE_IN_CHUNK = 90;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -284,7 +290,7 @@ export async function reconcileClientLocations(
   const stale = (results ?? [])
     .map((r) => r.id)
     .filter((id): id is number => id != null && !fetched.has(String(id)));
-  for (const part of chunk(stale, INSERT_CHUNK)) {
+  for (const part of chunk(stale, DELETE_IN_CHUNK)) {
     if (!part.length) continue;
     const ph = part.map(() => "?").join(", ");
     await db.batch([db.prepare(`DELETE FROM locations WHERE id IN (${ph})`).bind(...part)]);
@@ -355,7 +361,7 @@ async function syncTable<T>(
     // Usually empty, so a steady-state sync issues no DELETE batches at all.
     const fetched = new Set<string>(deduped.map((r) => String(keyOf(r))));
     const stale = dbKeys.filter((k) => !fetched.has(String(k)));
-    for (const part of chunk(stale, INSERT_CHUNK)) {
+    for (const part of chunk(stale, DELETE_IN_CHUNK)) {
       if (!part.length) continue;
       const placeholders = part.map(() => "?").join(", ");
       await db.batch([db.prepare(`DELETE FROM ${table} WHERE ${keyCol} IN (${placeholders})`).bind(...part)]);

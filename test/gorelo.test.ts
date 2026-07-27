@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { retryDelayMs } from "../src/gorelo.js";
+import { extractTicketNumber, retryDelayMs } from "../src/gorelo.js";
+
+describe("extractTicketNumber", () => {
+  it("reads the live create-response `id` field", () => {
+    expect(extractTicketNumber({ id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a" })).toBe(
+      "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a",
+    );
+  });
+
+  it("still tolerates the earlier `ticketId` field name", () => {
+    expect(extractTicketNumber({ ticketId: "abc" })).toBe("abc");
+  });
+
+  it("unwraps a nested envelope and returns null when nothing matches", () => {
+    expect(extractTicketNumber({ data: { id: "nested" } })).toBe("nested");
+    expect(extractTicketNumber({ nope: 1 })).toBeNull();
+    expect(extractTicketNumber(null)).toBeNull();
+  });
+});
 
 const withRetryAfter = (value: string | null): Response =>
   new Response("", { status: 429, headers: value == null ? {} : { "retry-after": value } });

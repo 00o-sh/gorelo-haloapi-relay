@@ -100,9 +100,39 @@ export interface CreatePublicTicketCommand {
   sendTicketCreatedEmail: boolean;
 }
 
-/** POST /v1/tickets response. CONFIRMED (swagger CreatePublicTicketResult): only a uuid. */
+/**
+ * POST /v1/tickets response. CONFIRMED (live swagger CreatePublicTicketResult):
+ * `{ "id": "<uuid>" }` — the created ticket's GUID (NOT a human ticket number).
+ * The human `number`/`displayNumber` is read back via GET /v1/tickets by matching
+ * this `id` (see GoreloClient.resolveTicketNumber). Was `{ ticketId }` in an
+ * earlier spec revision; `extractTicketNumber` still tolerates the old field.
+ */
 export interface CreatePublicTicketResult {
-  ticketId: string | null;
+  id: string | null;
+}
+
+/**
+ * GET /v1/tickets item (subset of PublicTicketListItemModel actually read here).
+ * `id` is the ticket GUID (matches the create response); `number` is the numeric
+ * ticket number and `displayNumber` its formatted form — the human-facing values.
+ */
+export interface PublicTicketListItem {
+  id: string;
+  number?: number | null;
+  displayNumber?: string | null;
+  title?: string | null;
+  clientId?: number | null;
+  contactId?: number | null;
+}
+
+/** GET /v1/tickets envelope (PublicTicketListItemModelPagedResponse). */
+export interface PublicTicketListResponse {
+  data?: PublicTicketListItem[] | null;
+  totalCount?: number;
+  nextCursor?: string | null;
+  previousCursor?: string | null;
+  hasMore?: boolean;
+  hasPrevious?: boolean;
 }
 
 /** GET /v1/assets/agents item. NOTE: no MAC field exists. `id` is a STRING. */

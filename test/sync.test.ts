@@ -198,6 +198,27 @@ describe("syncAll delta reconcile (inline tables + location fan-out)", () => {
     expect(gone?.n).toBe(0);
   });
 
+  it("deletes more than 100 stale rows without blowing D1's bound-variable cap", async () => {
+    // Seed 250 mirror devices, then let upstream return an empty fleet so every
+    // one is stale. The delete IN-list must chunk under D1's ~100-param-per-query
+    // limit — a single 250-placeholder DELETE throws "too many SQL variables".
+    const N = 250;
+    const inserts = Array.from({ length: N }, (_, i) =>
+      env.DB
+        .prepare(
+          `INSERT INTO devices (hostname, client_id, location_id, agent_id, asset_num) VALUES (?, ?, ?, ?, ?)`,
+        )
+        .bind(`pc-${i}`, 10, 100, `agent-${i}`, i + 1),
+    );
+    await env.DB.batch(inserts);
+    expect(await count("devices")).toBe(N);
+
+    data.agents = []; // upstream fleet is now empty -> all 250 are stale
+    const r = await syncAll(makeQueue().env);
+    expect(r.deleted).toBe(N);
+    expect(await count("devices")).toBe(0);
+  });
+
   it("drops locations of a client that vanished upstream (inline, D1-only)", async () => {
     // Seed two clients' locations via the consumer, then remove client 20.
     data.clients.push({ id: 20, name: "NewCo" });

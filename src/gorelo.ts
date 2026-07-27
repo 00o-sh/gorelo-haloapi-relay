@@ -5,6 +5,8 @@ import type {
   PublicClientResponse,
   PublicContactResponse,
   PublicDeviceResponse,
+  PublicTicketListItem,
+  PublicTicketListResponse,
 } from "./types.js";
 
 /** Error carrying the upstream Gorelo HTTP status so the handler can surface a 502. */
@@ -170,6 +172,55 @@ export class GoreloClient {
       return body;
     }
   }
+
+  /**
+   * GET /v1/tickets — the paged ticket list (added to the Gorelo public API in
+   * 2026-07). Cursor-paginated; defaults mirror the swagger (pageSize 50, newest
+   * `updatedOn` first). Used to read a ticket's human number back after a create
+   * (see resolveTicketNumber) — there is no GET /v1/tickets/{id}.
+   */
+  async listTickets(
+    params?: {
+      cursor?: string;
+      pageSize?: number;
+      sortBy?: string;
+      sortOrder?: string;
+    },
+    maxAttempts = 4,
+  ): Promise<PublicTicketListResponse> {
+    const qs = new URLSearchParams();
+    if (params?.cursor) qs.set("cursor", params.cursor);
+    if (params?.pageSize != null) qs.set("pageSize", String(params.pageSize));
+    if (params?.sortBy) qs.set("sortBy", params.sortBy);
+    if (params?.sortOrder) qs.set("sortOrder", params.sortOrder);
+    const q = qs.toString();
+    return this.getJsonWithRetry<PublicTicketListResponse>(`/v1/tickets${q ? `?${q}` : ""}`, maxAttempts);
+  }
+
+  /**
+   * Read a ticket's human-facing number back from its create-response GUID. The
+   * create returns only the `id` (a UUID); the number/displayNumber live on the
+   * GET /v1/tickets list items. A just-created ticket sorts to the top by
+   * createdOn, so we scan the first page and match by id. Best-effort: returns
+   * null on any miss/failure so surfacing the number never blocks ticket creation.
+   */
+  async resolveTicketNumber(
+    id: string,
+    pageSize = 50,
+  ): Promise<{ number: number | null; displayNumber: string | null } | null> {
+    if (!id) return null;
+    try {
+      // Runs inline in the create response path, so bound the retries (one quick
+      // retry) — a slow rate-limit backoff would delay the caller for a value we
+      // treat as best-effort anyway.
+      const page = await this.listTickets({ sortBy: "createdOn", sortOrder: "desc", pageSize }, 2);
+      const match = (page.data ?? []).find((t: PublicTicketListItem) => t.id === id);
+      if (!match) return null;
+      return { number: match.number ?? null, displayNumber: match.displayNumber ?? null };
+    } catch {
+      return null;
+    }
+  }
 }
 
 /** Accept a bare array or a common { items|data|results: [...] } envelope. */
@@ -185,19 +236,20 @@ function asArray<T>(raw: unknown): T[] {
 }
 
 /**
- * Extract the ticket identifier from a POST /v1/tickets response.
- * CONFIRMED (swagger CreatePublicTicketResult): the response is
- * `{ "ticketId": "<uuid>" }` — a GUID, not a human ticket number (Gorelo's
- * public API exposes no ticket-number field and no GET-ticket endpoint). The
- * Halo mock uses this uuid to correlate the created ticket and log it.
- * `ticketId` is checked first; the rest are defensive fallbacks.
+ * Extract the created ticket's GUID from a POST /v1/tickets response.
+ * CONFIRMED (live swagger CreatePublicTicketResult): the response is now
+ * `{ "id": "<uuid>" }` — a GUID, not a human ticket number. The Halo mock uses
+ * this uuid to correlate the created ticket, log it, and read the human
+ * number/displayNumber back via GET /v1/tickets (GoreloClient.resolveTicketNumber).
+ * `id` is checked first; `ticketId` (the earlier field name) and the rest are
+ * defensive fallbacks so a spec revert or envelope shape still resolves.
  */
 export function extractTicketNumber(raw: unknown): string | null {
   if (raw == null) return null;
   if (typeof raw === "string" || typeof raw === "number") return String(raw);
   if (typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
-    for (const key of ["ticketId", "ticketNumber", "number", "id"]) {
+    for (const key of ["id", "ticketId", "ticketNumber", "number"]) {
       const v = obj[key];
       if (typeof v === "string" || typeof v === "number") return String(v);
     }
