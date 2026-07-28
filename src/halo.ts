@@ -4,10 +4,12 @@ import {
   getAgentIdByAssetNum,
   getClientName,
   getContactById,
+  getCreatedTicket,
   getLastSync,
   initSchema,
   listClientRows,
   listLocationRows,
+  putCreatedTicket,
   putPendingTicket,
   searchContactRows,
   searchDeviceRows,
@@ -1017,6 +1019,58 @@ function numberTag(n: TicketNumber): string {
   return `number=${hasNumber(n) ? (n.displayNumber ?? n.number) : "?"}`;
 }
 
+/**
+ * Record a created Gorelo ticket in the ledger, keyed by the Halo id we hand back,
+ * so GET /api/Tickets/{id} (Huntress's verify step) can answer for real. Best-effort:
+ * a ledger write failure must not fail the create response.
+ */
+async function recordCreatedTicket(
+  env: Env,
+  haloId: number,
+  goreloId: string,
+  number: TicketNumber,
+  cmd: CreatePublicTicketCommand,
+): Promise<void> {
+  try {
+    await putCreatedTicket(env.DB, {
+      halo_id: haloId,
+      gorelo_id: goreloId || null,
+      number: number?.number ?? null,
+      display_number: number?.displayNumber ?? null,
+      title: cmd.title,
+      client_id: cmd.clientId,
+      contact_id: cmd.contactId,
+      status_id: cmd.statusId,
+      created_at: nowIso(),
+    });
+  } catch (err) {
+    breadcrumb(`HALO created-ticket ledger write failed halo_id=${haloId}: ${describeError(err)}`);
+  }
+}
+
+/**
+ * GET /api/Tickets/{id} — Huntress calls this after a create to verify the ticket
+ * exists (and read its number). Serve it from the created-ticket ledger; a real
+ * answer stops Huntress from treating the create as failed and retrying (a
+ * duplicate source). 404 when we have no record of that id.
+ */
+async function handleGetTicketById(env: Env, id: number): Promise<Response> {
+  const row = await getCreatedTicket(env.DB, id);
+  if (!row) return jsonResponse(404, { id, message: "ticket not found" });
+  return jsonResponse(200, {
+    id: row.halo_id,
+    summary: row.title ?? "",
+    client_id: row.client_id ?? 0,
+    site_id: 0,
+    user_id: row.contact_id ?? 0,
+    tickettype_id: Number(env.DEFAULT_TYPE_ID),
+    status_id: row.status_id ?? Number(env.DEFAULT_STATUS_ID),
+    gorelo_ticket_id: row.gorelo_id,
+    gorelo_ticket_number: row.number,
+    gorelo_display_number: row.display_number,
+  });
+}
+
 async function handleCreateTicket(
   env: Env,
   ctx: ExecutionContext | undefined,
@@ -1028,20 +1082,25 @@ async function handleCreateTicket(
   const cmd = buildTicketCommand(env, t, routing, product);
   const haloId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
 
-  // One-shot products (deferCreate=false, e.g. Huntress) send the whole ticket here
-  // and never follow up with a /actions note, so there is nothing to fold in — create
-  // the Gorelo ticket immediately. On failure, fall back to the pending queue so the
-  // orphan flush retries it (same resilience as the deferred path below).
+  // Eager create (deferCreate=false — Huntress AND now Tier2): the whole report is
+  // already in this /tickets body, so create the Gorelo ticket now, read its real
+  // number back, and hand THAT number back as the ticket id — so the client shows
+  // the real number and (Huntress) its verify GET /api/Tickets/{id} finds it. On
+  // failure, fall back to the pending queue so the orphan flush / an /actions note
+  // retries it (same resilience as the deferred path below).
   if (product && !product.deferCreate) {
     let number: TicketNumber = null;
+    let goreloId = "";
+    let created = false;
     try {
       const client = new GoreloClient(env);
       const raw = await client.createTicket(cmd);
-      const uuid = extractTicketNumber(raw) ?? "";
+      goreloId = extractTicketNumber(raw) ?? "";
       // Read the human ticket number back from the create GUID (best-effort).
-      number = await client.resolveTicketNumber(uuid);
+      number = await client.resolveTicketNumber(goreloId);
+      created = true;
       breadcrumb(
-        `HALO created gorelo ticket ${uuid} immediately (product=${product.key} halo_id=${haloId} ` +
+        `HALO created gorelo ticket ${goreloId} immediately (product=${product.key} halo_id=${haloId} ` +
           `client=${routing.clientId} contact=${routing.contactId} ${numberTag(number)} ` +
           `email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
       );
@@ -1051,7 +1110,10 @@ async function handleCreateTicket(
         `HALO immediate create failed (product=${product.key} halo_id=${haloId}), queued for retry: ${describeError(err)}`,
       );
     }
-    return haloCreatedTicket(env, haloId, cmd, t, routing, number);
+    // The id we return: the real Gorelo number when resolved, else the surrogate.
+    const returnedId = created && number?.number != null ? number.number : haloId;
+    if (created) await recordCreatedTicket(env, returnedId, goreloId, number, cmd);
+    return haloCreatedTicket(env, returnedId, cmd, t, routing, number);
   }
 
   // Tier2 two-step flow: DON'T create yet. Queue the command keyed by the Halo id we
@@ -1144,6 +1206,8 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
     // The deferred Gorelo ticket now exists — this is the earliest the real
     // number is knowable, so read it back and hand it to Tier2 in the response.
     const number = await client.resolveTicketNumber(uuid);
+    // Ledger the create keyed by the Halo id Tier2 was handed at /tickets time.
+    await recordCreatedTicket(env, haloId, uuid, number, cmd);
     breadcrumb(
       `HALO created gorelo ticket ${uuid} from action (halo_id=${haloId} client=${cmd.clientId} ` +
         `contact=${cmd.contactId} ${numberTag(number)} email=${cmd.sendTicketCreatedEmail ? "y" : "n"})`,
@@ -1311,6 +1375,10 @@ export async function flushPendingTickets(env: Env, limit = CRON_FLUSH_LIMIT): P
       const cmd = JSON.parse(row.command) as CreatePublicTicketCommand;
       const raw = await client.createTicket(cmd);
       const uuid = extractTicketNumber(raw) ?? "";
+      // Ledger the create (keyed by the id the client holds) so a later verify GET
+      // resolves. Skip the number read-back here — this runs in the time-boxed
+      // flush, and existence (not the number) is what the verify step needs.
+      await recordCreatedTicket(env, row.halo_id, uuid, null, cmd);
       created++;
       breadcrumb(
         `HALO orphan-flush created gorelo ticket ${uuid} (halo_id=${row.halo_id} ` +
@@ -1352,6 +1420,11 @@ async function handleApi(
 
   if (resource === "ticket" || resource === "tickets") {
     if (method === "POST") return handleCreateTicket(env, ctx, body, matchProduct(request, env));
+    // GET /api/Tickets/{id} — the client's post-create verify step (Huntress).
+    if (method === "GET") {
+      const id = trailingId(url.pathname);
+      if (id != null) return handleGetTicketById(env, id);
+    }
     return jsonResponse(200, { tickets: [], record_count: 0 });
   }
   if (resource === "action" || resource === "actions") {
