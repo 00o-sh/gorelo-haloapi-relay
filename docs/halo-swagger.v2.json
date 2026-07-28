@@ -14607,7 +14607,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": { }
+                  "additionalProperties": {}
                 }
               }
             }
@@ -107617,7 +107617,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": { }
+              "additionalProperties": {}
             },
             "nullable": true
           },
@@ -107625,7 +107625,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": { }
+              "additionalProperties": {}
             },
             "nullable": true
           },
@@ -142390,7 +142390,7 @@
           },
           "conditions": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           }
         },
@@ -150375,7 +150375,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": { }
+              "additionalProperties": {}
             },
             "nullable": true
           },
@@ -155905,43 +155905,43 @@
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": { }
+              "additionalProperties": {}
             },
             "nullable": true
           },
           "chart_labels": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           },
           "chart_dataset": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           },
           "chart_dataset1": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           },
           "chart_dataset2": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           },
           "chart_dataset3": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           },
           "chart_dataset4": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           },
           "chart_dataset5": {
             "type": "array",
-            "items": { },
+            "items": {},
             "nullable": true
           },
           "base_link": {
@@ -155956,7 +155956,7 @@
             "type": "object",
             "additionalProperties": {
               "type": "array",
-              "items": { },
+              "items": {},
               "nullable": true
             },
             "nullable": true
@@ -187947,7 +187947,7 @@
   },
   "security": [
     {
-      "Bearer": [ ]
+      "Bearer": []
     }
   ]
 }

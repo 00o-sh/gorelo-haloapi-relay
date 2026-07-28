@@ -477,8 +477,12 @@ report-link extraction, orphan flush), and the string normalizers.
 
 A snapshot of the live spec is captured at [`docs/gorelo-swagger.v1.json`](docs/gorelo-swagger.v1.json).
 See [`docs/gorelo-swagger.md`](docs/gorelo-swagger.md) for the source URL and how the
-snapshot is kept fresh — a nightly [drift workflow](.github/workflows/gorelo-swagger-drift.yml)
-opens a PR when the live spec changes.
+snapshot is kept fresh. Both upstream specs — Gorelo **and** the HaloPSA spec
+([`docs/halo-swagger.v2.json`](docs/halo-swagger.v2.json), see
+[`docs/halo-swagger.md`](docs/halo-swagger.md)) — are synced by the shared
+`scripts/sync-swagger.py` helper, and a nightly
+[drift workflow](.github/workflows/swagger-drift.yml) opens a PR for either when its
+live spec changes.
 
 - **`POST /v1/tickets` response** — `{ "id": "<uuid>" }` (the ticket's GUID, not a
   human number). `extractTicketNumber` reads `id`.
