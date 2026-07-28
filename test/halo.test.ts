@@ -1177,6 +1177,29 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
     });
   });
 
+  it("preserves HTML line breaks in the free-text body instead of flattening them", async () => {
+    await withHuntressEnabled(async () => {
+      const cap = captureGoreloCreate();
+      // A Huntress-shaped report whose body carries its section structure as HTML
+      // block/break tags (an email body), not a Tier2 <td> table.
+      const details =
+        "Investigative Summary:<br>An anomalous login was detected.<p>Remediations:</p>" +
+        "<div>Kill all current sessions.</div>";
+      const res = await req(
+        "/api/Tickets",
+        huntressInit([{ summary: "Huntress Alert", details, client_id: "10" }]),
+      );
+      expect(res.status).toBe(201);
+      const desc = String(cap.posted()!.description);
+      // The <br>/<p>/<div> breaks survive as <br> — the sections stay on their own
+      // lines instead of collapsing into one flattened paragraph.
+      expect(desc).toContain("Investigative Summary:<br>An anomalous login was detected.");
+      expect(desc).toContain("Remediations:");
+      expect(desc).toContain("Kill all current sessions.");
+      expect(desc).not.toContain("detected. Remediations: Kill all");
+    });
+  });
+
   it("surfaces the real Gorelo number in the immediate created-ticket response", async () => {
     await withHuntressEnabled(async () => {
       captureGoreloCreate({ uuid: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a", number: 900123, displayNumber: "T-900123" });

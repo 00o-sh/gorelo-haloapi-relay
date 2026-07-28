@@ -509,7 +509,13 @@ function htmlToText(s: string): string {
   const stripped = s
     .replace(/<style[\s\S]*?<\/style[^>]*>/gi, " ")
     .replace(/<script[\s\S]*?<\/script[^>]*>/gi, " ")
-    .replace(/<head[\s\S]*?<\/head[^>]*>/gi, " ");
+    .replace(/<head[\s\S]*?<\/head[^>]*>/gi, " ")
+    // Preserve visual line breaks before stripTags collapses every tag to a space:
+    // <br> and block-closing tags become newlines, so an HTML-bodied report (e.g. a
+    // Huntress alert) keeps its section/line structure instead of flattening into
+    // one paragraph. Mirrors the conversion extractSelectionItems already does.
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|li|tr|h[1-6]|table|thead|tbody|section|article|blockquote)\s*>/gi, "\n");
   return decodeEntities(stripTags(stripped))
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
