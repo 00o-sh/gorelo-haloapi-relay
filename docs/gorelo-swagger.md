@@ -24,15 +24,18 @@ Refresh or verify it with the helper script (standard library only, no deps):
 
 ```sh
 # Rewrite the snapshot from the live spec (prints a change summary)
-scripts/sync-gorelo-swagger.py --summary
+scripts/sync-swagger.py gorelo --summary
 
 # CI-style check: exit non-zero if the snapshot is stale, without writing
-scripts/sync-gorelo-swagger.py --check
+scripts/sync-swagger.py gorelo --check
 
 # Point at another spec URL (e.g. the AU region)
 GORELO_SWAGGER_URL=https://api.aue.gorelo.io/swagger/v1/swagger.json \
-  scripts/sync-gorelo-swagger.py --check
+  scripts/sync-swagger.py gorelo --check
 ```
+
+The same script syncs the Halo spec — pass `halo` instead of `gorelo` (see
+[`halo-swagger.md`](halo-swagger.md)).
 
 The script serializes the spec deterministically (2-space indent, UTF-8,
 trailing newline), so a byte diff in the snapshot reflects a real upstream change
@@ -40,9 +43,10 @@ rather than formatting noise.
 
 ## Automated drift detection
 
-The [`gorelo-swagger-drift`](../.github/workflows/gorelo-swagger-drift.yml)
-GitHub Actions workflow runs the sync script nightly. When the live spec no
-longer matches the committed snapshot it opens (or refreshes) a pull request on
-the `automation/gorelo-swagger-sync` branch that updates the snapshot and
-summarizes what changed — the prompt to re-verify `src/types.ts` and the mock.
-It can also be run on demand from the Actions tab (**Run workflow**).
+The [`swagger-drift`](../.github/workflows/swagger-drift.yml) GitHub Actions
+workflow runs the sync script nightly for each spec (a `gorelo` + `halo` matrix).
+When a live spec no longer matches its committed snapshot it opens (or refreshes)
+a pull request on the `automation/<spec>-swagger-sync` branch (e.g.
+`automation/gorelo-swagger-sync`) that updates the snapshot and summarizes what
+changed — the prompt to re-verify `src/types.ts` and the mock. It can also be run
+on demand from the Actions tab (**Run workflow**).
