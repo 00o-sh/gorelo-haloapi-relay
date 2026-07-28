@@ -181,6 +181,18 @@ a pre-claimed batch; a failed create is re-queued with a fresh timestamp and ret
 grace window later. Submitter name and body heading are product-aware (Huntress →
 `"Huntress"` / `"Details"` vs the HDB `"Helpdesk Buttons"` / `"Report Summary"`).
 
+**Huntress resolutions.** Huntress signals an incident resolution by **editing the
+original ticket** (a `POST /Tickets` carrying its `id`) to its configured *"Status after
+Huntress Resolution"*. Gorelo has **no ticket-update endpoint** (`POST`/`GET` only — no
+`PUT`/`PATCH`, no `/v1/tickets/{id}`), so the relay can't mutate the original Gorelo
+ticket. Instead, when an incoming `POST /tickets` carries an `id` that matches a row in
+the `created_tickets` ledger (a ticket **we** issued — a brand-new alert never does, so a
+real alert can't be misread as a resolution), the relay files a **clearly-labeled
+resolution notice** in Gorelo — a `Resolved: …` ticket that names the original and lands
+in `DEFAULT_RESOLVED_STATUS_ID` (falls back to `DEFAULT_STATUS_ID` when unset) — marks the
+original resolved in the ledger, and echoes the original id back as resolved. The original
+Gorelo ticket must still be **closed manually** (the notice says so), since the API can't.
+
 > **Note — Tier2 was previously a deferred two-step** (`/tickets` queued, `/actions`
 > folded the HDB "View Report" link in before creating). It's now eager so the
 > confirmation screen can show the real number; the trade is that the "View Report"
@@ -483,6 +495,10 @@ opens a PR when the live spec changes.
 - **`statusId` is required** despite being marked `nullable` in the swagger — a
   create without it returns HTTP 400, so `DEFAULT_STATUS_ID` (default `1` = New) is
   always sent. `contactId` is optional and left null when no client contact matches.
+- **`DEFAULT_RESOLVED_STATUS_ID`** (optional) — the status a Huntress **resolution
+  notice** lands in (see "Huntress resolutions" above); set it to your Gorelo
+  "Resolved"/"Closed" status id (`GET /v1/tickets/statuses`). Unset → falls back to
+  `DEFAULT_STATUS_ID`.
 - **`DEFAULT_PRIORITY`** — the spec ships `PublicTicketPriority=[0..4]` as a bare int
   enum with no labels and no list endpoint; read the label off the Gorelo ticket UI.
   `DEFAULT_SOURCE=6` is the API/integration source (confirmed accepted).

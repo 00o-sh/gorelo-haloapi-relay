@@ -80,6 +80,14 @@ DEFAULT_TYPE_ID = "7045"
 # statusId returns HTTP 400 (confirmed by testing), even though the swagger marks it nullable.
 DEFAULT_STATUS_ID = "1"
 
+# Status a Huntress-resolution notice lands in. Huntress signals a resolution by EDITING
+# the source ticket to its configured "Status after Huntress Resolution"; Gorelo has no
+# ticket-update API, so we file a labeled resolution ticket in this status instead (and
+# mark the original resolved in our ledger). Set to your Gorelo "Resolved"/"Closed" status
+# id (GET /v1/tickets/statuses). Unset -> falls back to DEFAULT_STATUS_ID (notice still
+# files, just not in a closed status).
+# DEFAULT_RESOLVED_STATUS_ID = "5"
+
 # PublicTicketPriority enum = [0,1,2,3,4]. Ships WITHOUT labels in the spec.
 # TODO(verify): confirm which int is your desired default priority in the Gorelo UI. 2 = a middle default.
 DEFAULT_PRIORITY = "2"

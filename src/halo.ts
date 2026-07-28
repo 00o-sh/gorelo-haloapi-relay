@@ -16,6 +16,7 @@ import {
   takePendingTicket,
   takeStalePendingTickets,
   type ContactRow,
+  type CreatedTicketRow,
   type DeviceFullRow,
 } from "./db.js";
 import { notify } from "@ambersecurityinc/notifly";
@@ -941,6 +942,43 @@ function extractNoteLinks(html: string): Array<{ label: string; href: string }> 
   return out;
 }
 
+/** The Gorelo status a resolution notice lands in (DEFAULT_RESOLVED_STATUS_ID, else the default). */
+function resolvedStatusId(env: Env): number {
+  return Number(env.DEFAULT_RESOLVED_STATUS_ID) || Number(env.DEFAULT_STATUS_ID);
+}
+
+/** A human-facing reference to the original ticket (display number, else number, else id). */
+function originalTicketRef(original: CreatedTicketRow): string {
+  return (
+    original.display_number ||
+    (original.number != null ? String(original.number) : `#${original.halo_id}`)
+  );
+}
+
+/**
+ * Rewrite a build command into a Huntress-resolution notice: a clear banner naming
+ * the original ticket (which the upstream Gorelo API can't close programmatically),
+ * a "Resolved:" title, the resolved status, and no auto-email. Mutates `cmd`.
+ */
+function asResolutionNotice(env: Env, cmd: CreatePublicTicketCommand, original: CreatedTicketRow): void {
+  const ref = originalTicketRef(original);
+  const banner =
+    `${heading("Huntress incident resolved")}<br>` +
+    `Huntress marked this incident resolved and set the source ticket to its ` +
+    `post-resolution status.<br>` +
+    `Original ticket: ${esc(ref)}${original.title ? ` — ${esc(original.title)}` : ""}<br>` +
+    `The upstream ticket system has no update API, so the original ticket must be ` +
+    `closed manually.`;
+  cmd.title = original.title ? `Resolved: ${original.title}` : `Resolved: ${cmd.title}`;
+  cmd.description = `${banner}<br><br>${cmd.description}`;
+  cmd.statusId = resolvedStatusId(env);
+  cmd.sendTicketCreatedEmail = false;
+  // Route the notice to the same client/contact as the original — a bare resolution
+  // edit rarely carries routing fields, so without this it would fall to the catch-all.
+  if (original.client_id) cmd.clientId = original.client_id;
+  if (original.contact_id) cmd.contactId = original.contact_id;
+}
+
 function buildTicketCommand(
   env: Env,
   t: HaloTicket,
@@ -1088,6 +1126,20 @@ async function handleCreateTicket(
   const cmd = buildTicketCommand(env, t, routing, product);
   const haloId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
 
+  // Huntress resolution: Huntress signals "resolved" by EDITING the original ticket
+  // (a POST /Tickets carrying its id) to the configured post-resolution status. Gorelo
+  // has no ticket-update endpoint, so we can't mutate the original Gorelo ticket —
+  // instead we file a clearly-labeled resolution ticket (in a resolved status) that
+  // names the original, and mark the original resolved in our ledger so a verify GET
+  // reflects it. Detection is conservative: only an incoming id we actually issued
+  // counts (a brand-new alert never carries a ledger-known id), so a real alert can
+  // never be misread as a resolution and silently closed.
+  const editId = num(t.id) ?? num(t.ticket_id) ?? num(t.ticketid);
+  if (editId != null) {
+    const original = await getCreatedTicket(env.DB, editId);
+    if (original) return handleResolution(env, routing, cmd, original);
+  }
+
   // Eager create (deferCreate=false — Huntress AND now Tier2): the whole report is
   // already in this /tickets body, so create the Gorelo ticket now, read its real
   // number back, and hand THAT number back as the ticket id — so the client shows
@@ -1141,6 +1193,65 @@ async function handleCreateTicket(
   );
 
   return haloCreatedTicket(env, haloId, cmd, t, routing);
+}
+
+/**
+ * A Huntress resolution edit of an existing ticket (POST /Tickets carrying a
+ * ledger-known id). The Gorelo API can't update the original, so we file a labeled
+ * resolution ticket in a resolved status, mark the original resolved in our ledger,
+ * and echo the original id back as resolved so Huntress sees its edit succeed.
+ */
+async function handleResolution(
+  env: Env,
+  routing: Routing,
+  cmd: CreatePublicTicketCommand,
+  original: CreatedTicketRow,
+): Promise<Response> {
+  asResolutionNotice(env, cmd, original);
+  const rid = cmd.statusId;
+
+  // File the resolution notice in Gorelo (best-effort; on failure queue for retry so
+  // the orphan flush picks it up, same resilience as the normal create path).
+  const noticeId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
+  try {
+    const client = new GoreloClient(env);
+    const raw = await client.createTicket(cmd);
+    const goreloId = extractTicketNumber(raw) ?? "";
+    const number = await client.resolveTicketNumber(goreloId);
+    await recordCreatedTicket(env, number?.number ?? noticeId, goreloId, number, cmd);
+    breadcrumb(
+      `HALO resolution notice for original halo_id=${original.halo_id} filed as gorelo ${goreloId} ` +
+        `(${numberTag(number)} status=${rid})`,
+    );
+  } catch (err) {
+    await putPendingTicket(env.DB, noticeId, JSON.stringify(cmd), nowIso());
+    breadcrumb(
+      `HALO resolution notice create failed for original halo_id=${original.halo_id}, ` +
+        `queued for retry: ${describeError(err)}`,
+    );
+  }
+
+  // Mark the original resolved in our ledger (upsert with the resolved status) so a
+  // verify GET /api/Tickets/{id} on the original reflects the resolution.
+  try {
+    await putCreatedTicket(env.DB, { ...original, status_id: rid });
+  } catch (err) {
+    breadcrumb(`HALO resolution ledger update failed halo_id=${original.halo_id}: ${describeError(err)}`);
+  }
+
+  // Echo the edited (original) ticket back as resolved — Huntress edited THAT id, so
+  // returning a new id would break its correlation.
+  return jsonResponse(200, {
+    id: original.halo_id,
+    summary: original.title ?? cmd.title,
+    client_id: original.client_id ?? routing.clientId,
+    site_id: 0,
+    user_id: original.contact_id ?? 0,
+    tickettype_id: Number(env.DEFAULT_TYPE_ID),
+    status_id: rid,
+    gorelo_ticket_number: original.number,
+    gorelo_display_number: original.display_number,
+  });
 }
 
 /** Parse "...ticket number 264274883401817..." out of a note's text. */
