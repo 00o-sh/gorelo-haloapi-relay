@@ -25,6 +25,12 @@ export interface Env {
   DEFAULT_GROUP_ID: string; // int as string
   DEFAULT_TYPE_ID: string; // int as string
   DEFAULT_STATUS_ID: string; // int as string (REQUIRED by Gorelo's validator)
+  // Gorelo status id used for a Huntress-resolution notice (see handleCreateTicket).
+  // Huntress signals a resolution by EDITING the original ticket to its configured
+  // "Status after Huntress Resolution"; Gorelo has no ticket-update API, so we file a
+  // labeled resolution ticket in this status instead. Unset -> falls back to
+  // DEFAULT_STATUS_ID (notice still lands, just not in a closed status).
+  DEFAULT_RESOLVED_STATUS_ID?: string; // int as string
   DEFAULT_PRIORITY: string; // PublicTicketPriority int as string
   DEFAULT_SOURCE: string; // TicketSource int as string
   CATCHALL_CLIENT_ID: string; // int as string

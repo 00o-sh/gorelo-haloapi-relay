@@ -1177,6 +1177,29 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
     });
   });
 
+  it("preserves HTML line breaks in the free-text body instead of flattening them", async () => {
+    await withHuntressEnabled(async () => {
+      const cap = captureGoreloCreate();
+      // A Huntress-shaped report whose body carries its section structure as HTML
+      // block/break tags (an email body), not a Tier2 <td> table.
+      const details =
+        "Investigative Summary:<br>An anomalous login was detected.<p>Remediations:</p>" +
+        "<div>Kill all current sessions.</div>";
+      const res = await req(
+        "/api/Tickets",
+        huntressInit([{ summary: "Huntress Alert", details, client_id: "10" }]),
+      );
+      expect(res.status).toBe(201);
+      const desc = String(cap.posted()!.description);
+      // The <br>/<p>/<div> breaks survive as <br> — the sections stay on their own
+      // lines instead of collapsing into one flattened paragraph.
+      expect(desc).toContain("Investigative Summary:<br>An anomalous login was detected.");
+      expect(desc).toContain("Remediations:");
+      expect(desc).toContain("Kill all current sessions.");
+      expect(desc).not.toContain("detected. Remediations: Kill all");
+    });
+  });
+
   it("surfaces the real Gorelo number in the immediate created-ticket response", async () => {
     await withHuntressEnabled(async () => {
       captureGoreloCreate({ uuid: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a", number: 900123, displayNumber: "T-900123" });
@@ -1231,6 +1254,66 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
       await withHuntressEnabled(async () => {
         const got = await req("/api/Tickets/424242424242", huntressGet);
         expect(got.status).toBe(404);
+      });
+    });
+
+    // Huntress resolves an incident by EDITING the original ticket (POST /Tickets with
+    // its id) to a "resolved" status. Gorelo can't update a ticket, so the relay files a
+    // labeled resolution notice, marks the original resolved, and echoes the original id.
+    it("files a labeled resolution notice and marks the original resolved on a Huntress edit", async () => {
+      await withHuntressEnabled(async () => {
+        await env.DB.prepare(`DELETE FROM created_tickets`).run();
+        const e = env as { DEFAULT_RESOLVED_STATUS_ID?: string };
+        const prev = e.DEFAULT_RESOLVED_STATUS_ID;
+        e.DEFAULT_RESOLVED_STATUS_ID = "5"; // the Gorelo "Resolved" status id
+        try {
+          const cap = captureGoreloCreate({ number: 700900, displayNumber: "T-700900" });
+          // 1) Original alert -> Gorelo ticket, ledgered under number 700900.
+          const created = await req(
+            "/api/Tickets",
+            huntressInit([{ summary: "Suspicious login", details: "anomalous", client_id: "10" }]),
+          );
+          const id = ((await created.json()) as { id: number }).id;
+          expect(id).toBe(700900);
+
+          // 2) Huntress resolves by editing that ticket to a resolved status.
+          const resolved = await req("/api/Tickets", huntressInit([{ id, status_id: 3 }]));
+          expect(resolved.status).toBe(200); // the resolution echo, not a 201 create
+          const body = (await resolved.json()) as Record<string, unknown>;
+          // Echoes the ORIGINAL id, now resolved (status 5) — Huntress edited THAT id.
+          expect(body).toMatchObject({ id: 700900, status_id: 5, gorelo_ticket_number: 700900 });
+
+          // The notice filed in Gorelo is clearly labeled, resolved, and references the original.
+          const notice = cap.posted()!;
+          expect(String(notice.title)).toBe("Resolved: Suspicious login");
+          expect(notice.statusId).toBe(5);
+          expect(notice.sendTicketCreatedEmail).toBe(false);
+          expect(String(notice.description)).toContain("Huntress incident resolved");
+          expect(String(notice.description)).toContain("T-700900");
+
+          // The original now reads back as resolved (status 5) from the ledger.
+          const got = await req("/api/Tickets/700900", huntressGet);
+          expect(((await got.json()) as Record<string, unknown>).status_id).toBe(5);
+        } finally {
+          e.DEFAULT_RESOLVED_STATUS_ID = prev;
+        }
+      });
+    });
+
+    it("treats a POST carrying an unknown ticket id as a normal create, not a resolution", async () => {
+      await withHuntressEnabled(async () => {
+        await env.DB.prepare(`DELETE FROM created_tickets`).run();
+        const cap = captureGoreloCreate({ number: 800200, displayNumber: "T-800200" });
+        // An id that was never issued by us must NOT be misread as a resolution — a real
+        // alert can't be silently closed.
+        const res = await req(
+          "/api/Tickets",
+          huntressInit([{ id: 555555, summary: "Fresh alert", details: "new", client_id: "10" }]),
+        );
+        expect(res.status).toBe(201); // a normal create, not the 200 resolution echo
+        expect(((await res.json()) as Record<string, unknown>).id).toBe(800200);
+        expect(String(cap.posted()!.title)).toBe("Fresh alert");
+        expect(String(cap.posted()!.description)).not.toContain("Huntress incident resolved");
       });
     });
 });
