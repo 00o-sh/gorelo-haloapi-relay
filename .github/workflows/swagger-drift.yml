@@ -38,7 +38,7 @@ jobs:
       BRANCH: automation/${{ matrix.spec }}-swagger-sync
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Sync snapshot from the live spec
         id: sync
