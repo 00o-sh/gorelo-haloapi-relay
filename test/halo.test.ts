@@ -1137,6 +1137,11 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
     },
     body: JSON.stringify(bodyObj),
   });
+  // A Huntress-shaped GET (no body) for the post-create verify step.
+  const huntressGet: RequestInit = {
+    method: "GET",
+    headers: { "user-agent": "Huntress Halo Integration", "CF-Connecting-IP": "52.4.130.244" },
+  };
 
   async function withHuntressEnabled(fn: () => Promise<void>): Promise<void> {
     const e = env as { ENABLE_HUNTRESS?: string };
@@ -1202,5 +1207,90 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
         .first<{ command: string }>();
       expect(row).not.toBeNull();
     });
+  });
+
+  it("serves the post-create verify GET /api/Tickets/{id} from the ledger", async () => {
+      await withHuntressEnabled(async () => {
+        captureGoreloCreate({ number: 700111, displayNumber: "T-700111" });
+        const created = await req(
+          "/api/Tickets",
+          huntressInit([{ summary: "Verify me", details: "x", client_id: "10" }]),
+        );
+        const id = ((await created.json()) as { id: number }).id;
+        expect(id).toBe(700111); // real Gorelo number handed back as the id
+
+        // Huntress now GETs that id to confirm the ticket exists.
+        const got = await req("/api/Tickets/" + id, huntressGet);
+        expect(got.status).toBe(200);
+        const t = (await got.json()) as Record<string, unknown>;
+        expect(t).toMatchObject({ id, gorelo_ticket_number: 700111, gorelo_display_number: "T-700111" });
+      });
+    });
+
+    it("returns 404 for a verify GET of an unknown ticket id", async () => {
+      await withHuntressEnabled(async () => {
+        const got = await req("/api/Tickets/424242424242", huntressGet);
+        expect(got.status).toBe(404);
+      });
+    });
+});
+
+// Tier2 is now an EAGER-create product (deferCreate=false): the report is already
+// in the /tickets body, so we create in Gorelo immediately and return the real
+// number. Matching the tier2 product requires its source IP (the earlier "deferred"
+// block sends no IP, so it exercises the null-product fallback, which still defers).
+describe("Halo eager create — matched Tier2 product", () => {
+  const TIER2_IP = "34.202.14.153";
+  const tier2Init = (bodyObj: unknown): RequestInit => ({
+    method: bodyObj === undefined ? "GET" : "POST",
+    headers: {
+      "content-type": "application/json",
+      "halo-app-name": "tier2tech",
+      "CF-Connecting-IP": TIER2_IP,
+    },
+    ...(bodyObj === undefined ? {} : { body: JSON.stringify(bodyObj) }),
+  });
+
+  it("creates on /tickets (not deferred) and returns the real Gorelo number as id", async () => {
+    const cap = captureGoreloCreate({ number: 500777, displayNumber: "T-500777" });
+    const res = await req(
+      "/tickets",
+      tier2Init([{ summary: "Printer down", details_html: reportHtml({ email: "user@corp.com" }) }]),
+    );
+    expect(res.status).toBe(201);
+    expect(cap.posted()).toBeDefined(); // created NOW, not queued
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.id).toBe(500777); // the real number, not the synthetic surrogate
+    expect(body.gorelo_display_number).toBe("T-500777");
+    const queued = await env.DB.prepare(`SELECT halo_id FROM pending_tickets`).first();
+    expect(queued).toBeNull();
+    // The report body still lands in the ticket (it comes from the /tickets payload).
+    expect(String(cap.posted()?.description)).toContain("user@corp.com");
+  });
+
+  it("a follow-up /actions note is a no-op — no duplicate ticket", async () => {
+    let creates = 0;
+    routes.push({
+      method: "POST",
+      match: (u) => u.pathname === "/v1/tickets",
+      handler: () => {
+        creates++;
+        return json(200, { id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a" });
+      },
+    });
+    routes.push({
+      method: "GET",
+      match: (u) => u.pathname === "/v1/tickets",
+      handler: () =>
+        json(200, { data: [{ id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a", number: 500779 }], hasMore: false }),
+    });
+    const created = await req(
+      "/tickets",
+      tier2Init([{ summary: "X", details_html: reportHtml({ email: "user@corp.com" }) }]),
+    );
+    const id = ((await created.json()) as { id: number }).id;
+    const act = await req("/actions", tier2Init([{ ticket_id: id, note_html: "note" }]));
+    expect(act.status).toBe(201);
+    expect(creates).toBe(1); // eager create only — the note did NOT create a second ticket
   });
 });

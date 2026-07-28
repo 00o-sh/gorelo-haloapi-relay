@@ -66,7 +66,13 @@ export const PRODUCTS: Record<string, Product> = {
     // migration needed for the existing deployment.
     clientIdVar: "HALO_CLIENT_ID",
     clientSecretVar: "HALO_CLIENT_SECRET",
-    deferCreate: true, // two-step: /tickets then /actions note folds in before the create
+    // Eager create: the report is already in the /tickets body, so we create the
+    // Gorelo ticket on /tickets and return its REAL number (Tier2 shows it on the
+    // "Help Data Delivered" screen). The follow-up /actions note only carried the
+    // HDB "View Report" link, which Gorelo has no way to append post-create, so it
+    // is intentionally dropped; /actions becomes a no-op (still a create fallback
+    // if the eager create failed and queued the command).
+    deferCreate: false,
     ticketCreatedBy: "Helpdesk Buttons",
     ticketBodyHeading: "Report Summary",
   },

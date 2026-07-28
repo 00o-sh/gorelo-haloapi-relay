@@ -4,7 +4,7 @@
 // applied so later syncs skip the whole idempotent block — it costs ~14
 // subrequests every run otherwise, and syncAll runs under the Worker's
 // per-invocation subrequest cap.
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "3";
 
 /** Create the mirror tables + indexes if they don't exist (idempotent). */
 export async function initSchema(db: D1Database): Promise<void> {
@@ -81,6 +81,24 @@ export async function initSchema(db: D1Database): Promise<void> {
       )`,
     ),
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_tickets (created_at)`),
+    // Ledger of tickets we've actually created in Gorelo, keyed by the Halo ticket
+    // id we handed back to the client. Huntress does GET /api/Tickets/{id} after a
+    // create to verify it exists (and read the number); without a real answer it
+    // treats the create as failed and retries -> duplicates. We serve that GET from
+    // here, and it doubles as a dedup record.
+    db.prepare(
+      `CREATE TABLE IF NOT EXISTS created_tickets (
+        halo_id        INTEGER PRIMARY KEY,
+        gorelo_id      TEXT,
+        number         INTEGER,
+        display_number TEXT,
+        title          TEXT,
+        client_id      INTEGER,
+        contact_id     INTEGER,
+        status_id      INTEGER,
+        created_at     TEXT NOT NULL
+      )`,
+    ),
   ]);
 
   // Additive migration: a devices table created before Phase 2 lacks the new
@@ -333,6 +351,57 @@ export async function putPendingTicket(
     )
     .bind(haloId, command, createdAt, attempts)
     .run();
+}
+
+/** A created-ticket ledger row (what we handed the Halo client ↔ the Gorelo ticket). */
+export interface CreatedTicketRow {
+  halo_id: number;
+  gorelo_id: string | null;
+  number: number | null;
+  display_number: string | null;
+  title: string | null;
+  client_id: number | null;
+  contact_id: number | null;
+  status_id: number | null;
+  created_at: string;
+}
+
+/** Record a ticket we created in Gorelo, keyed by the Halo id handed to the client. */
+export async function putCreatedTicket(db: D1Database, row: CreatedTicketRow): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO created_tickets
+         (halo_id, gorelo_id, number, display_number, title, client_id, contact_id, status_id, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(halo_id) DO UPDATE SET
+         gorelo_id = excluded.gorelo_id, number = excluded.number,
+         display_number = excluded.display_number, title = excluded.title,
+         client_id = excluded.client_id, contact_id = excluded.contact_id,
+         status_id = excluded.status_id, created_at = excluded.created_at`,
+    )
+    .bind(
+      row.halo_id,
+      row.gorelo_id,
+      row.number,
+      row.display_number,
+      row.title,
+      row.client_id,
+      row.contact_id,
+      row.status_id,
+      row.created_at,
+    )
+    .run();
+}
+
+/** Look up a created ticket by the Halo id we handed back (for GET /api/Tickets/{id}). */
+export async function getCreatedTicket(db: D1Database, haloId: number): Promise<CreatedTicketRow | null> {
+  return db
+    .prepare(
+      `SELECT halo_id, gorelo_id, number, display_number, title, client_id, contact_id, status_id, created_at
+       FROM created_tickets WHERE halo_id = ? LIMIT 1`,
+    )
+    .bind(haloId)
+    .first<CreatedTicketRow>();
 }
 
 /** Atomically claim (delete + return) one pending ticket by its Halo id. */

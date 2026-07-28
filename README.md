@@ -13,7 +13,7 @@ the Gorelo API on the back, translating between them.
 
 | Product | Source | Ticket create |
 |---|---|---|
-| **Tier2Tickets / Helpdesk Buttons** | 2 fixed IPs | two-step: `POST /tickets` then a `/actions` note (**deferred** create) |
+| **Tier2Tickets / Helpdesk Buttons** | 2 fixed IPs | `POST /tickets` creates immediately and returns the real ticket number; the `/actions` note is a no-op |
 | **Huntress** | its source IPs/CIDRs + `User-Agent: Huntress Halo Integration` | one-shot: everything in `POST /api/Tickets` (**immediate** create) |
 
 A product runs its Halo integration against the Worker: it authenticates (OAuth2),
@@ -35,9 +35,9 @@ doesn't choke on them.
 Helpdesk Buttons ──Halo API (OAuth + lookups + create + note)──▶  Worker  ──▶ Gorelo POST /v1/tickets
    (Tier2 cloud, 2 fixed IPs)                                       │
    POST /token                                                      ├─ answer user/client/site/asset lookups from the D1 mirror
-   GET  /users /client /site /asset                                 ├─ POST /tickets: resolve routing, QUEUE the command
-   POST /tickets                                                    ├─ POST /actions: fold in report links, CREATE the Gorelo ticket
-   POST /actions (report note)                                      └─ orphan flush creates any press whose note never arrives
+   GET  /users /client /site /asset                                 ├─ POST /tickets: resolve routing, CREATE now, return the real number
+   POST /tickets                                                    ├─ GET /api/Tickets/{id}: verify (served from the created ledger)
+   POST /actions (report note)                                      └─ POST /actions: no-op accept (create fallback if /tickets failed)
 
 Cron (every 6h) / POST /admin/sync / first-call bootstrap ──▶ syncAll() delta-reconciles the D1 mirror
 ```
@@ -158,26 +158,35 @@ list endpoints use the `*_View` **paging envelope** (`page_no`/`page_size`/`reco
 | `GET /client/{id}` | a **single** Halo `Area` object (not the list envelope) — name from the mirror, synthesized for an unmirrored id (e.g. the catch-all) |
 | `GET /asset?search={hostname}` | the Gorelo **agent/device** (numeric surrogate id ↔ agent UUID) in the `Device_View` envelope |
 | `GET /tickettype\|status\|team\|priority` | **full-shape** bare arrays (`src/haloShapes.ts`); `status` returns an open→closed set so a PSA editor's closed-status mapping resolves |
-| `POST /tickets` (or `/api/Tickets`) | build the Gorelo command, then create **per product** (below). Accepts a single object or a Halo-style array |
-| `POST /actions` | folds the report links into the queued command, then **creates** the Gorelo ticket (Tier2 two-step path) |
+| `POST /tickets` (or `/api/Tickets`) | build the Gorelo command and **create it immediately**, returning the real Gorelo ticket number as the id. Accepts a single object or a Halo-style array |
+| `GET /api/Tickets/{id}` | the client's post-create **verify** step (Huntress): served from the `created_tickets` ledger — 200 with the ticket + real number, or 404 |
+| `POST /actions` | a no-op accept for the Tier2 two-step (the create already happened on `/tickets`); still creates as a fallback if an earlier create failed and queued the command |
 
-**Per-product create** (branched on `matchProduct`, `src/products.ts`):
+**Immediate create (both products, `deferCreate: false`).** The full report is already
+in the `/tickets` body, so we create the Gorelo ticket on `/tickets`, read its real
+number back (`GET /v1/tickets`), and hand **that number** back as the ticket id. This
+matters because:
 
-- **Deferred (Tier2, `deferCreate: true`):** Tier2 posts the ticket, then the report as
-  a separate `/actions` note. Gorelo has no ticket-append endpoint, so `/tickets` queues
-  the command in `pending_tickets` and the `/actions` note creates the single Gorelo
-  ticket. A press whose note never arrives is created by an orphan flush (the
-  `*/5 * * * *` cron, plus an opportunistic sweep off live requests) after
-  `PENDING_GRACE_MS`. The flush claims one orphan at a time and bounds how many it
-  processes per run (a small cap on the request-path sweep, larger on the cron), so
-  the request's `waitUntil` task can't overrun its budget and drop a pre-claimed
-  batch; a failed create is re-queued with a fresh timestamp and retried a grace
-  window later.
-- **Immediate (Huntress, `deferCreate: false`):** the whole ticket arrives in the one
-  POST and there's no follow-up note, so the Gorelo ticket is created **right away**
-  (falling back to the pending queue if that call fails, so the orphan flush retries).
-  The submitter name and body heading are product-aware (Huntress → `"Huntress"` /
-  `"Details"` instead of the HDB `"Helpdesk Buttons"` / `"Report Summary"`).
+- The client shows the **real** Gorelo number, not a synthetic surrogate.
+- **Huntress** then calls `GET /api/Tickets/{id}` to verify creation; we answer it from
+  the `created_tickets` ledger, so it stops treating the create as failed and retrying
+  (a duplicate source).
+
+If the create call fails, we fall back to the `pending_tickets` queue so the orphan
+flush (the `*/5 * * * *` cron, plus a small opportunistic sweep off live requests)
+retries it after `PENDING_GRACE_MS` — and for Tier2 the follow-up `/actions` note also
+creates it as a fallback. The flush claims one orphan at a time and bounds how many it
+processes per run, so the request's `waitUntil` task can't overrun its budget and drop
+a pre-claimed batch; a failed create is re-queued with a fresh timestamp and retried a
+grace window later. Submitter name and body heading are product-aware (Huntress →
+`"Huntress"` / `"Details"` vs the HDB `"Helpdesk Buttons"` / `"Report Summary"`).
+
+> **Note — Tier2 was previously a deferred two-step** (`/tickets` queued, `/actions`
+> folded the HDB "View Report" link in before creating). It's now eager so the
+> confirmation screen can show the real number; the trade is that the "View Report"
+> link the `/actions` note carried can't be added post-create (Gorelo has no
+> ticket-append endpoint), so it's dropped. The report summary itself is in the
+> `/tickets` body, so tickets keep their content.
 
 **Dead-letter (both paths):** a command that keeps failing to create is **dead-lettered**
 (logged + dropped) after `MAX_PENDING_ATTEMPTS`, so it can't retry forever — and if
@@ -209,22 +218,17 @@ Report** link (screenshots/diagnostics). The routing outcome is logged, not show
 **Priority:** a press flagged "This is an emergency" is created at `EMERGENCY_PRIORITY`
 (else `DEFAULT_PRIORITY`).
 
-**The real Gorelo ticket number is now resolved and surfaced.** Gorelo's
-`POST /v1/tickets` returns only the ticket GUID (`{ "id": "<uuid>" }`), but the
-`GET /v1/tickets` list (added 2026-07) carries the human `number` / `displayNumber`.
-After each create the relay reads the number back by matching that GUID
-(`GoreloClient.resolveTicketNumber`) and surfaces it:
-- **Immediate products (Huntress)** create in-line, so the created-ticket response
-  includes `gorelo_ticket_number` / `gorelo_display_number`.
-- **Deferred products (Tier2)** don't create the Gorelo ticket until the `/actions`
-  note arrives, so the number is returned on the **`/actions`** response
-  (`gorelo_ticket_number` / `gorelo_display_number`) — the earliest it's knowable.
-
-The lookup is best-effort (a failed read-back never blocks ticket creation), and it
-does **not** change the synthetic `haloId` echoed at `POST /tickets` time — for the
-deferred flow the Gorelo ticket doesn't exist yet at that moment, so Tier2's
-"Help Data Delivered" screen still shows the surrogate unless it reads the number
-from the later `/actions` response. Tracked in
+**The real Gorelo ticket number is resolved and handed back as the ticket id.**
+Gorelo's `POST /v1/tickets` returns only the ticket GUID (`{ "id": "<uuid>" }`), but
+the `GET /v1/tickets` list (added 2026-07) carries the human `number` / `displayNumber`.
+Because both products now create on `POST /tickets` (see above), the relay reads the
+number back by matching that GUID (`GoreloClient.resolveTicketNumber`) and returns it
+as the **ticket id** in the create response — so Tier2's "Help Data Delivered" screen
+and Huntress both show the real number instead of a synthetic surrogate. The
+`gorelo_ticket_number` / `gorelo_display_number` fields carry it explicitly too, and
+`GET /api/Tickets/{id}` (served from the `created_tickets` ledger) returns it on a
+verify. The read-back is best-effort — if it fails, we fall back to the synthetic
+surrogate id and the ledger row still records the create. Tracked in
 [#35](https://github.com/salientmsp/tier2tickets-relay/issues/35).
 
 **Requester email:** Gorelo's "ticket created" email is suppressed by default
