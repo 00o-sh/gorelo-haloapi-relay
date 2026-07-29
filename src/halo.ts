@@ -731,6 +731,33 @@ const esc = (s: string): string =>
 
 const heading = (title: string): string => `<b>${esc(title)}</b>`;
 
+// Bare http(s) URLs in a free-text body (e.g. Huntress's "Escalation:" link) arrive
+// as plain text, so Gorelo renders them unclickable. Match a URL run up to the first
+// whitespace/angle-bracket/quote and turn it into an <a>.
+const URL_RE = /https?:\/\/[^\s<>"']+/gi;
+
+/**
+ * Escape `text` for HTML AND turn any bare http(s) URL into a clickable link. Escaping
+ * and linkifying happen in one pass so URL and non-URL spans are each escaped exactly
+ * once (escaping already-built anchor markup would break the href). Trailing sentence
+ * punctuation is kept out of the href so "…/818208." links to "…/818208".
+ */
+function linkify(text: string): string {
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    const url = m[0];
+    const start = m.index ?? 0;
+    out += esc(text.slice(last, start));
+    const trimmed = url.replace(/[.,;:!?)\]}'"]+$/, ""); // don't swallow trailing punctuation
+    const href = esc(trimmed);
+    out += `<a href="${href}">${href}</a>${esc(url.slice(trimmed.length))}`;
+    last = start + url.length;
+  }
+  out += esc(text.slice(last));
+  return out;
+}
+
 /** Ordered label/value pairs from the report table, original casing preserved. */
 function parseReportPairs(html: string): Array<{ label: string; value: string }> {
   const out: Array<{ label: string; value: string }> = [];
@@ -876,13 +903,36 @@ function deviceSection(agent: PublicDeviceResponse | null, d: DeviceFullRow | nu
   return lines.length ? `${heading("Device")}<br>${lines.join("<br>")}` : "";
 }
 
+/** Render Halo's `customfields` ([{name,value}, …]) as readable lines, not raw JSON. */
+function customFieldLines(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const item of v) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const name = nonEmpty(o.name ?? o.label ?? o.id);
+    if (!name) continue;
+    const value = o.value;
+    const rendered =
+      value == null || value === "" ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
+    out.push(`${esc(name)}: ${linkify(truncate(rendered))}`);
+  }
+  return out;
+}
+
 /** Any remaining top-level fields Tier2 sent (beyond what we surface elsewhere). */
 function extraFieldLines(t: HaloTicket): string[] {
   const lines: string[] = [];
   for (const [k, v] of Object.entries(t)) {
     if (DUMP_SKIP.has(k) || v == null || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+    // customfields is a [{name,value}] array — render each pair, not the JSON blob.
+    if (k === "customfields") {
+      const fields = customFieldLines(v);
+      if (fields.length) lines.push(...fields);
+      continue;
+    }
     const rendered = typeof v === "object" ? JSON.stringify(v) : String(v);
-    lines.push(`${esc(k)}: ${esc(truncate(rendered))}`);
+    lines.push(`${esc(k)}: ${linkify(truncate(rendered))}`);
   }
   return lines;
 }
@@ -898,14 +948,14 @@ function buildHaloDescription(t: HaloTicket, routing: Routing, product: Product 
   const pairs = parseReportPairs(raw);
   const rows = pairs
     .filter((p) => p.label.toLowerCase() !== "selections")
-    .map((p) => `${esc(p.label)}: ${esc(truncate(p.value))}`);
+    .map((p) => `${esc(p.label)}: ${linkify(truncate(p.value))}`);
   const sels = chosenSelections(raw, pairs);
   if (sels.length) {
     rows.push(`Selections:<br>${sels.map((s) => `&nbsp;&bull; ${esc(s)}`).join("<br>")}`);
   }
   const report = rows.length
     ? rows.join("<br>")
-    : esc(truncate(htmlToText(raw), BODY_MAX)).replace(/\n/g, "<br>");
+    : linkify(truncate(htmlToText(raw), BODY_MAX)).replace(/\n/g, "<br>");
   sections.push(`${heading(product?.ticketBodyHeading || "Report Summary")}<br>${report}`);
 
   // Any other submitted fields (rarely present after trimming the routing ids).

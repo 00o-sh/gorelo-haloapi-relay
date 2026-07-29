@@ -1200,6 +1200,57 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
     });
   });
 
+  it("hyperlinks the bare escalation URL in the free-text body", async () => {
+    await withHuntressEnabled(async () => {
+      const cap = captureGoreloCreate();
+      const details =
+        "Huntress detected one or more logins from United Kingdom.<br><br>" +
+        "Identity Provider: Microsoft 365<br><br>" +
+        "Organization: Ray of Hope<br>" +
+        "Escalation: https://salient.huntress.io/org/638042/escalations/818208";
+      const res = await req(
+        "/api/Tickets",
+        huntressInit([{ summary: "Suspicious login", details, client_id: "10" }]),
+      );
+      expect(res.status).toBe(201);
+      const desc = String(cap.posted()!.description);
+      // The escalation link becomes a real anchor a tech can click through to.
+      expect(desc).toContain(
+        '<a href="https://salient.huntress.io/org/638042/escalations/818208">' +
+          "https://salient.huntress.io/org/638042/escalations/818208</a>",
+      );
+      // The surrounding narrative is preserved.
+      expect(desc).toContain("Identity Provider: Microsoft 365");
+      expect(desc).toContain("Organization: Ray of Hope");
+    });
+  });
+
+  it("renders customfields as readable name: value lines, not a raw JSON blob", async () => {
+    await withHuntressEnabled(async () => {
+      const cap = captureGoreloCreate();
+      const res = await req(
+        "/api/Tickets",
+        huntressInit([
+          {
+            summary: "Suspicious login",
+            details: "anomalous",
+            client_id: "10",
+            customfields: [
+              { name: "CFHuntressRecordType", value: 1 },
+              { name: "CFHuntressExternalId", value: 818208 },
+            ],
+          },
+        ]),
+      );
+      expect(res.status).toBe(201);
+      const desc = String(cap.posted()!.description);
+      expect(desc).toContain("CFHuntressRecordType: 1");
+      expect(desc).toContain("CFHuntressExternalId: 818208");
+      // The raw array JSON no longer leaks into the ticket body.
+      expect(desc).not.toContain('[{"name":"CFHuntressRecordType"');
+    });
+  });
+
   it("surfaces the real Gorelo number in the immediate created-ticket response", async () => {
     await withHuntressEnabled(async () => {
       captureGoreloCreate({ uuid: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a", number: 900123, displayNumber: "T-900123" });
