@@ -2,6 +2,14 @@ import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  test: {
+    // The heaviest specs (e.g. sync idempotency) run several full syncAll passes
+    // over the miniflare D1 isolate, which carries real per-op overhead. Vitest's
+    // 5s default is tight for that under a loaded CI runner and flakes as a timeout
+    // (not an assertion). 15s gives headroom while still failing a genuine hang.
+    testTimeout: 15000,
+    hookTimeout: 15000,
+  },
   plugins: [
     cloudflareTest({
       wrangler: { configPath: "./wrangler.toml" },
