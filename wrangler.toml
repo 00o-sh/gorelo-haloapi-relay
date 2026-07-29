@@ -101,10 +101,19 @@ DEFAULT_SOURCE = "6"
 # MSP's own default client with a triage note for a tech to reassign.
 CATCHALL_CLIENT_ID = "15567"
 
-# Gorelo tag applied to every Helpdesk Buttons ticket (tagIds on the create command).
-# 31974 "Submitted VIA HDB" — lets you filter/report on HDB-originated tickets. This is
-# a TAG (not a ticket type; DEFAULT_TYPE_ID stays 7045 "Incident"). Unset to skip tagging.
+# Per-product "Submitted via …" tags (tagIds on the create command) — lets you
+# filter/report on tickets by the source that submitted them. Each ticket is tagged with
+# its own product's tag; a product with no tag of its own falls back to FALLBACK_TAG_ID
+# below. These are TAGS (not the ticket type; DEFAULT_TYPE_ID stays 7045 "Incident").
+# Unset any of them to skip that tag.
+# 31974 "Submitted VIA HDB" — Helpdesk Buttons / Tier2 tickets.
 HDB_TAG_ID = "31974"
+# 32870 "Submitted via Huntress" — Huntress tickets.
+HUNTRESS_TAG_ID = "32870"
+# 32885 "Submitted via API" — catch-all applied when a ticket's product has no tag of its
+# own (a service onboarded before its dedicated tag is wired up, or a request that matched
+# no product). Ensures nothing is left untagged if we forget to add a per-service tag.
+FALLBACK_TAG_ID = "32885"
 
 # Priority id used when a press is flagged "This is an emergency" (else DEFAULT_PRIORITY).
 # PublicTicketPriority enum [0..4]; 1 is the top priority in the Gorelo UI ("Critical").

@@ -90,7 +90,8 @@ wrangler queues create tier2tickets-sync
 # 3. Fill the Gorelo IDs in wrangler.toml [vars]
 GORELO_API_KEY=xxxx ./scripts/gorelo-ids.sh
 #   -> set DEFAULT_GROUP_ID, DEFAULT_TYPE_ID, DEFAULT_STATUS_ID, DEFAULT_PRIORITY,
-#      DEFAULT_SOURCE, CATCHALL_CLIENT_ID, HDB_TAG_ID, EMERGENCY_PRIORITY, DEBUG_LOGS,
+#      DEFAULT_SOURCE, CATCHALL_CLIENT_ID, HDB_TAG_ID, HUNTRESS_TAG_ID, FALLBACK_TAG_ID,
+#      EMERGENCY_PRIORITY, DEBUG_LOGS,
 #      HALO_TOKEN_ENFORCE (off|observe|enforce — see Security)
 
 # 4. Set secrets (never committed)
@@ -258,9 +259,15 @@ never sends the email, so it can't notify the wrong party.
 / contact ids (the lookups return them). Assets use a deterministic numeric surrogate
 of the agent UUID (`asset_num`, stored in D1), mapped back on create.
 
-**Tagging:** every HDB ticket gets the Gorelo tag `HDB_TAG_ID` (31974 "Submitted VIA
-HDB") via `tagIds`, for filtering/reporting. This is a tag, not the ticket type
-(`DEFAULT_TYPE_ID` stays 7045 "Incident").
+**Tagging:** every ticket gets a "Submitted via …" Gorelo tag (via `tagIds`) naming the
+source that submitted it, for filtering/reporting. Each product carries its own tag —
+Helpdesk Buttons/Tier2 → `HDB_TAG_ID` (31974 "Submitted VIA HDB"), Huntress →
+`HUNTRESS_TAG_ID` (32870 "Submitted via Huntress"). A ticket whose product has no tag of
+its own — a new service onboarded before its dedicated tag is wired up, or a request that
+matched no product — falls back to `FALLBACK_TAG_ID` (32885 "Submitted via API") so
+nothing is left untagged. These are tags, not the ticket type (`DEFAULT_TYPE_ID` stays
+7045 "Incident"). To add a per-service tag: set the product's `tagVar` in
+`src/products.ts` and its `*_TAG_ID` var in `wrangler.toml`.
 
 **Attachments (screenshots / diagnostic data):** the binaries are **not** sent to us.
 HDB hosts the full report and the remote session on its own portal and only sends

@@ -1029,6 +1029,20 @@ function asResolutionNotice(env: Env, cmd: CreatePublicTicketCommand, original: 
   if (original.contact_id) cmd.contactId = original.contact_id;
 }
 
+/**
+ * The Gorelo tag ids for a ticket from `product`: its own "Submitted via …" tag when
+ * configured (tier2 -> HDB_TAG_ID, huntress -> HUNTRESS_TAG_ID), otherwise the catch-all
+ * FALLBACK_TAG_ID ("Submitted via API"). The fallback keeps a product that has no tag of
+ * its own — a new service onboarded before its dedicated tag is wired up, or a request
+ * that matched no product — from producing untagged tickets. Returns undefined (tagIds
+ * omitted) only when neither the product tag nor the fallback is set.
+ */
+function resolveTicketTagIds(env: Env, product: Product | null): number[] | undefined {
+  const productTag = product?.tagVar ? num(env[product.tagVar]) : null;
+  const tagId = productTag ?? num(env.FALLBACK_TAG_ID);
+  return tagId ? [tagId] : undefined;
+}
+
 function buildTicketCommand(
   env: Env,
   t: HaloTicket,
@@ -1036,7 +1050,6 @@ function buildTicketCommand(
   product: Product | null,
 ): CreatePublicTicketCommand {
   const summary = str(t.summary) || str(t.subject) || "(no subject)";
-  const tagId = num(env.HDB_TAG_ID);
   // "This is an emergency" bumps the priority (when EMERGENCY_PRIORITY is set).
   const emergencyId = num(env.EMERGENCY_PRIORITY);
   const priorityId = (routing.isEmergency && emergencyId ? emergencyId : Number(env.DEFAULT_PRIORITY)) as PublicTicketPriority;
@@ -1052,7 +1065,7 @@ function buildTicketCommand(
     typeId: Number(env.DEFAULT_TYPE_ID),
     priorityId,
     sourceId: Number(env.DEFAULT_SOURCE) as TicketSource,
-    tagIds: tagId ? [tagId] : undefined,
+    tagIds: resolveTicketTagIds(env, product),
     agentAssetIds: routing.agentAssetIds,
     // Only let Gorelo email the requester when SEND_TICKET_CREATED_EMAIL is on AND we
     // matched a real contact — otherwise the ticket lands on the catch-all client with
