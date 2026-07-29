@@ -70,6 +70,7 @@
           {
             "name": "cursor",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -77,6 +78,7 @@
           {
             "name": "pageSize",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -119,6 +121,7 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -159,6 +162,7 @@
           {
             "name": "cursor",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -166,6 +170,7 @@
           {
             "name": "pageSize",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -312,6 +317,7 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -353,6 +359,7 @@
             "name": "clientId",
             "in": "path",
             "required": true,
+            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -402,6 +409,7 @@
           {
             "name": "clientId",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -410,6 +418,7 @@
           {
             "name": "cursor",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -417,6 +426,7 @@
           {
             "name": "pageSize",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -563,6 +573,7 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -603,6 +614,7 @@
           {
             "name": "cursor",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -610,6 +622,7 @@
           {
             "name": "pageSize",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -742,6 +755,7 @@
           {
             "name": "cursor",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -749,6 +763,7 @@
           {
             "name": "pageSize",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -758,6 +773,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "string",
               "default": "updatedOn"
@@ -766,6 +782,7 @@
           {
             "name": "sortOrder",
             "in": "query",
+            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
