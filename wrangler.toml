@@ -131,6 +131,15 @@ SEND_TICKET_CREATED_EMAIL = "true"
 # contain PII/PHI (names, emails, phones) — only for short debugging windows.
 DEBUG_LOGS = "false"
 
+# Huntress → Jira fan-out for co-managed clients (src/jira.ts). Master switch:
+# "true" mirrors each Huntress alert into the enrolled client's own Jira Cloud (in
+# addition to the Gorelo ticket) and closes that Jira issue when Huntress resolves
+# the incident. "false" (default) disables it entirely. Which clients are enrolled
+# is set per-client in the JIRA_TARGETS secret — a client with no entry there is
+# never sent to Jira even when this is "true". The Gorelo ticket path is unchanged
+# either way: a Jira failure is queued for the */5 cron flush, never blocking a create.
+ENABLE_JIRA = "false"
+
 # Bearer-token enforcement on the Halo resource endpoints (audit F1). Only takes
 # effect when BOTH HALO_CLIENT_ID and HALO_CLIENT_SECRET secrets are set; the
 # gate is skipped entirely otherwise, and /token is always exempt.
@@ -161,6 +170,10 @@ HALO_TOKEN_ENFORCE = "enforce"
 #   wrangler secret put ADMIN_KEY           # gates POST /admin/sync (X-Admin-Key / X-API-Key / Authorization: Bearer)
 #   wrangler secret put NOTIFLY_URLS        # optional: notifly (Apprise) URL(s) alerted when a ticket is dead-lettered
 #                                           #   e.g. "ntfy://alerts" | Teams Workflows "workflows://…&sig=…" — comma/space separated
+#   wrangler secret put JIRA_TARGETS        # optional: per-client Jira destinations for the Huntress→Jira fan-out (with ENABLE_JIRA="true")
+#                                           #   JSON array; holds API tokens, so it's a secret. One entry per enrolled Gorelo client:
+#                                           #   [{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC",
+#                                           #     "issueType":"Task","email":"svc@acme.com","apiToken":"…","resolvedTransition":"Done"}]
 # Per-product Halo mock OAuth secrets (issue #51) — one client_secret per product,
 # paired with the client_id var above. Easiest: ./scripts/halo-cred.sh <product>
 #   (Windows PowerShell: ./scripts/halo-cred.ps1 <product>)

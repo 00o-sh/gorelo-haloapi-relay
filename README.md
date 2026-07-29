@@ -59,6 +59,7 @@ Cron (every 6h) / POST /admin/sync / first-call bootstrap ──▶ syncAll() de
 | `src/products.ts` | product registry (`PRODUCTS`, IPs/CIDRs, `ENABLE_*`, UA gate, per-product OAuth creds, `matchProduct`, `haloCredentials`, `ipAllowed`) |
 | `src/haloShapes.ts` | full Halo config-item shapes (status/type/priority/team), field lists derived from the swagger |
 | `src/gorelo.ts` | Gorelo API client (retry/backoff, defensive parsing) |
+| `src/jira.ts` | Jira Cloud client + per-client target config (the co-managed Huntress→Jira fan-out) |
 | `src/sync.ts` | `syncAll()` — rebuild the D1 mirror off the request path |
 | `src/db.ts` | D1 schema + point lookups (+ the deferred-ticket queue) |
 | `src/parse.ts` | small string normalizers (`normalizeHost`, `normalizeEmail`) |
@@ -329,6 +330,54 @@ product's token can't authorize another's request. A product whose pair is **uns
 stays lenient (any creds accepted, no enforcement), so products can be onboarded /
 rolled out independently. Generate a pair and push its secret with
 `./scripts/halo-cred.sh <product>` (or `./scripts/halo-cred.ps1 <product>` on Windows).
+
+## Jira output (co-managed clients)
+
+Some co-managed clients want their **Huntress alerts in their own Jira** as well as in
+Gorelo. When enabled, the relay **mirrors each Huntress alert into that client's Jira
+Cloud** — creating a Jira issue at the same moment it creates the Gorelo ticket — and
+**closes the Jira issue when Huntress resolves the incident**. The Gorelo ticket is and
+stays the system of record; Jira is a mirror.
+
+This is done **in the relay** (not off a Gorelo webhook) on purpose: only the relay sees
+the Huntress *incident-resolved* edit (Huntress signals a resolution by editing the
+original ticket — see the resolution note above), so only the relay can drive the Jira
+issue to a resolved status. A Gorelo ticket-creation webhook fires on create only and
+couldn't carry that close signal, nor the alert body / real `clientId` the relay already
+holds.
+
+**Scope & enrollment.** Fan-out is **Huntress-only** and **per-client**. A client is
+enrolled exactly when it has an entry in the `JIRA_TARGETS` secret keyed by its Gorelo
+`clientId`; a client with no entry is never sent to Jira. The master switch is
+`ENABLE_JIRA` (off by default) — off means no fan-out at all.
+
+- **`ENABLE_JIRA`** (`wrangler.toml [vars]`, `"true"`/`"false"`, default off).
+- **`JIRA_TARGETS`** (a **secret** — it holds API tokens): a JSON array, one object per
+  enrolled client:
+
+  ```json
+  [{ "clientId": 15567, "baseUrl": "https://acme.atlassian.net",
+     "projectKey": "SEC", "issueType": "Task", "email": "svc@acme.com",
+     "apiToken": "…", "resolvedTransition": "Done" }]
+  ```
+
+  `issueType` defaults to `"Task"`; `resolvedTransition` is the workflow transition used
+  to close the issue on a Huntress resolution (optional — a resolution comment is added
+  regardless). Set it with `wrangler secret put JIRA_TARGETS`. Auth is Jira Cloud basic
+  auth (`email` + `apiToken`); the token is never logged.
+
+**Issue shape.** Summary = the ticket title; description = the same alert body sent to
+Gorelo (flattened to text) prefixed with a cross-reference to the Gorelo ticket number;
+labels `huntress` + `gorelo-<number>`. The created issue **key** is stored on the
+`created_tickets` ledger (`jira_issue_key`) so a later resolution can find and close it.
+
+**Best-effort, never blocks the ticket.** The fan-out runs in the request's `waitUntil`,
+so a slow or failing Jira call **cannot** delay or fail the Halo response or the Gorelo
+create. A failure is queued in a **`pending_jira`** table and retried by the same
+`*/5 * * * *` cron that flushes orphaned tickets (`flushPendingJira`); a `create` retry
+is guarded by the stored issue key so it can't duplicate. After `MAX_JIRA_ATTEMPTS` a job
+is **dead-lettered** to notifly (`NOTIFLY_URLS`) — the Gorelo ticket is unaffected, only
+the Jira mirror is out of sync.
 
 ## Data store & refresh
 

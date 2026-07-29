@@ -30,3 +30,10 @@ HALO_CLIENT_SECRET="halo-mock-client-secret"
 # Huntress uses its own (its distinct client_id). Uncomment to enable validation:
 # HALO_CLIENT_ID_HUNTRESS="13b3832f9306b677fb72eea412da5df7"
 # HALO_CLIENT_SECRET_HUNTRESS="huntress-mock-client-secret"
+
+# Optional: Huntress → Jira fan-out for co-managed clients. Set ENABLE_JIRA (a
+# [vars] flag in wrangler.toml) to "true", and list each enrolled client's Jira
+# destination here as a JSON array (this secret holds API tokens). A client is sent
+# to Jira only when its Gorelo clientId has an entry below. "resolvedTransition" is
+# the workflow transition used to close the issue on a Huntress resolution (optional).
+# JIRA_TARGETS='[{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC","issueType":"Task","email":"svc@acme.com","apiToken":"your-jira-api-token","resolvedTransition":"Done"}]'
