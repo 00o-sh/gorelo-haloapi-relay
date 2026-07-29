@@ -31,6 +31,8 @@ export default defineConfig({
           DEFAULT_SOURCE: "6",
           CATCHALL_CLIENT_ID: "999",
           HDB_TAG_ID: "31974",
+          HUNTRESS_TAG_ID: "32870",
+          FALLBACK_TAG_ID: "32885",
           EMERGENCY_PRIORITY: "1",
           GORELO_API_KEY: "test-gorelo-key",
           ADMIN_KEY: "test-admin-key",

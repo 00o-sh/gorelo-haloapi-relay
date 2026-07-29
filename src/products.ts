@@ -41,6 +41,14 @@ export interface Product {
   ticketCreatedBy: string;
   // Heading over the pasted ticket body (Tier2 uses Helpdesk-Buttons "Report Summary").
   ticketBodyHeading: string;
+
+  // Optional per-product "Submitted via …" tag, resolved from this Env var (a Gorelo
+  // tag id). When set and non-empty, every ticket from this product is tagged with it
+  // so you can filter/report by source (tier2 -> HDB_TAG_ID, huntress -> HUNTRESS_TAG_ID).
+  // When a product has NO tagVar, or its var is unset, the create falls back to the
+  // catch-all FALLBACK_TAG_ID ("Submitted via API") so a newly onboarded product is never
+  // left untagged before its own tag is wired up (see resolveTicketTagIds in halo.ts).
+  tagVar?: keyof Env;
 }
 
 /**
@@ -75,6 +83,7 @@ export const PRODUCTS: Record<string, Product> = {
     deferCreate: false,
     ticketCreatedBy: "Helpdesk Buttons",
     ticketBodyHeading: "Report Summary",
+    tagVar: "HDB_TAG_ID", // "Submitted VIA HDB"
   },
   // Huntress — additional source IPs + /28 ranges. Opt-in (off by default).
   // Gated on IP AND its self-declared User-Agent ("Huntress Halo Integration").
@@ -93,6 +102,7 @@ export const PRODUCTS: Record<string, Product> = {
     deferCreate: false, // one-shot: the whole ticket arrives in the create, no /actions note
     ticketCreatedBy: "Huntress",
     ticketBodyHeading: "Details",
+    tagVar: "HUNTRESS_TAG_ID", // "Submitted via Huntress"
   },
 };
 

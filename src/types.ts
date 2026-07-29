@@ -34,7 +34,15 @@ export interface Env {
   DEFAULT_PRIORITY: string; // PublicTicketPriority int as string
   DEFAULT_SOURCE: string; // TicketSource int as string
   CATCHALL_CLIENT_ID: string; // int as string
-  HDB_TAG_ID?: string; // Gorelo tag id applied to every HDB ticket ("Submitted VIA HDB")
+  // Per-product "Submitted via …" tags (resolved via each product's tagVar in
+  // src/products.ts). A ticket is tagged with its product's tag; a product with no
+  // configured tag (or a newly onboarded one) falls back to FALLBACK_TAG_ID so nothing
+  // is left untagged. Each is a Gorelo tag id (int as string); unset skips that tag.
+  HDB_TAG_ID?: string; // tag applied to Helpdesk Buttons tickets ("Submitted VIA HDB")
+  HUNTRESS_TAG_ID?: string; // tag applied to Huntress tickets ("Submitted via Huntress")
+  // Catch-all tag applied when a ticket's product has no tag of its own (e.g. a service
+  // onboarded before its dedicated tag is wired up) — "Submitted via API".
+  FALLBACK_TAG_ID?: string;
   EMERGENCY_PRIORITY?: string; // priority id for a press flagged "This is an emergency"
   // "true" asks Gorelo to send its "ticket created" email — but ONLY when the Worker
   // resolved a real client contact (contactId), so the mail never fires on the

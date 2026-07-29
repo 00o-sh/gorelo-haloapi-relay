@@ -550,7 +550,13 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     const cap = captureGoreloCreate();
     const created = await req("/tickets", {
       method: "POST",
-      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      // Drive it from a Tier2 source IP so matchProduct resolves the tier2 product and
+      // the ticket gets tier2's own HDB tag (asserted below).
+      headers: {
+        "content-type": "application/json",
+        "halo-app-name": "tier2tech",
+        "CF-Connecting-IP": "34.202.14.153",
+      },
       body: JSON.stringify([
         {
           summary: "Printer down",
@@ -580,7 +586,7 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
       statusId: 1,
       groupId: 7,
       typeId: 3,
-      tagIds: [31974],
+      tagIds: [31974], // tier2's own "Submitted VIA HDB" tag
       agentAssetIds: [AGENT_UUID],
     });
     const desc = String(posted?.description);
@@ -1167,7 +1173,8 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
       // Immediate: the Gorelo create fired on this POST (unlike Tier2's deferred path).
       const posted = cap.posted();
       expect(posted).toBeDefined();
-      expect(posted).toMatchObject({ title: "Huntress Test", clientId: 10 });
+      // Huntress tickets get their own "Submitted via Huntress" tag (not HDB's).
+      expect(posted).toMatchObject({ title: "Huntress Test", clientId: 10, tagIds: [32870] });
       // The free-text details land in the description (not the HDB "Report Summary").
       expect(String(posted!.description)).toContain("hello world");
       expect(String(posted!.description)).toContain("Details");
@@ -1175,6 +1182,27 @@ describe("Halo immediate ticket create (one-shot product: Huntress)", () => {
       const row = await env.DB.prepare(`SELECT halo_id FROM pending_tickets`).first();
       expect(row).toBeNull();
     });
+  });
+
+  it("falls back to the 'Submitted via API' tag when the product has no tag configured", async () => {
+    // Simulate a product whose dedicated tag isn't wired up yet: unset HUNTRESS_TAG_ID
+    // and confirm the create still tags the ticket with FALLBACK_TAG_ID (32885).
+    const e = env as { HUNTRESS_TAG_ID?: string };
+    const prev = e.HUNTRESS_TAG_ID;
+    e.HUNTRESS_TAG_ID = undefined;
+    try {
+      await withHuntressEnabled(async () => {
+        const cap = captureGoreloCreate();
+        const res = await req(
+          "/api/Tickets",
+          huntressInit([{ summary: "Huntress Test", details: "hello world", client_id: "10" }]),
+        );
+        expect(res.status).toBe(201);
+        expect(cap.posted()).toMatchObject({ tagIds: [32885] });
+      });
+    } finally {
+      e.HUNTRESS_TAG_ID = prev;
+    }
   });
 
   it("preserves HTML line breaks in the free-text body instead of flattening them", async () => {
