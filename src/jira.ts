@@ -1,5 +1,5 @@
 import { breadcrumb } from "./log.js";
-import { retryDelayMs } from "./gorelo.js";
+import { retryDelayMs, stripTrailingSlashes } from "./gorelo.js";
 import type { Env } from "./types.js";
 
 /**
@@ -88,7 +88,9 @@ export function parseJiraTargets(env: Env): Map<number, JiraTarget> {
     if (!entry || typeof entry !== "object") continue;
     const o = entry as Record<string, unknown>;
     const clientId = Number(o.clientId);
-    const baseUrl = strField(o, "baseUrl").replace(/\/+$/, "");
+    // Use the O(n) scan (not /\/+$/, which backtracks quadratically on long runs of
+    // trailing slashes — this config is external input, so avoid the ReDoS pattern).
+    const baseUrl = stripTrailingSlashes(strField(o, "baseUrl"));
     const projectKey = strField(o, "projectKey");
     const email = strField(o, "email");
     const apiToken = typeof o.apiToken === "string" ? o.apiToken : "";
