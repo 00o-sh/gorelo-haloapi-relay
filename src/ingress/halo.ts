@@ -27,6 +27,7 @@ import { assetNum, syncAll } from "./sync.js";
 import { haloCredentials, ipAllowed, matchProduct, type Product } from "./products.js";
 import { haloPriority, haloStatus, haloTeam, haloTicketType } from "./haloShapes.js";
 import { signToken, verifyTokenResult, type TokenPayload } from "../core/token.js";
+import { emitTicketCreated, emitTicketResolved } from "../core/events.js";
 import type {
   CreatePublicTicketCommand,
   Env,
@@ -1200,7 +1201,7 @@ async function handleCreateTicket(
   const editId = num(t.id) ?? num(t.ticket_id) ?? num(t.ticketid);
   if (editId != null) {
     const original = await getCreatedTicket(env.DB, editId);
-    if (original) return handleResolution(env, routing, cmd, original);
+    if (original) return handleResolution(env, ctx, routing, cmd, original, product);
   }
 
   // Eager create (deferCreate=false — Huntress AND now Tier2): the whole report is
@@ -1233,7 +1234,28 @@ async function handleCreateTicket(
     }
     // The id we return: the real Gorelo number when resolved, else the surrogate.
     const returnedId = created && number?.number != null ? number.number : haloId;
-    if (created) await recordCreatedTicket(env, returnedId, goreloId, number, cmd);
+    if (created) {
+      await recordCreatedTicket(env, returnedId, goreloId, number, cmd);
+      // Notify egress sinks that a Gorelo ticket was created. A no-op (identical
+      // behavior) when nothing is subscribed; a subscriber backgrounds its own I/O.
+      emitTicketCreated(
+        {
+          type: "ticket.created",
+          goreloId,
+          haloId: returnedId,
+          number: number?.number ?? null,
+          displayNumber: number?.displayNumber ?? null,
+          productKey: product.key,
+          clientId: routing.clientId,
+          locationId: routing.locationId,
+          contactId: routing.contactId,
+          deviceAssetIds: routing.agentAssetIds,
+          subject: cmd.title,
+          timestamp: nowIso(),
+        },
+        { env, ctx },
+      );
+    }
     return haloCreatedTicket(env, returnedId, cmd, t, routing, number);
   }
 
@@ -1266,9 +1288,11 @@ async function handleCreateTicket(
  */
 async function handleResolution(
   env: Env,
+  ctx: ExecutionContext | undefined,
   routing: Routing,
   cmd: CreatePublicTicketCommand,
   original: CreatedTicketRow,
+  product: Product | null,
 ): Promise<Response> {
   asResolutionNotice(env, cmd, original);
   const rid = cmd.statusId;
@@ -1301,6 +1325,28 @@ async function handleResolution(
   } catch (err) {
     breadcrumb(`HALO resolution ledger update failed halo_id=${original.halo_id}: ${describeError(err)}`);
   }
+
+  // Notify egress sinks that a ticket was resolved. No-op with no subscribers; a
+  // sink that mirrored this ticket looks up any sink-specific link from the ledger
+  // by original.haloId (no sink-specific field appears on the event).
+  emitTicketResolved(
+    {
+      type: "ticket.resolved",
+      original: {
+        haloId: original.halo_id,
+        goreloId: original.gorelo_id,
+        number: original.number,
+        displayNumber: original.display_number,
+        title: original.title,
+        clientId: original.client_id,
+        contactId: original.contact_id,
+      },
+      productKey: product?.key ?? null,
+      resolvedStatusId: rid,
+      timestamp: nowIso(),
+    },
+    { env, ctx },
+  );
 
   // Echo the edited (original) ticket back as resolved — Huntress edited THAT id, so
   // returning a new id would break its correlation.
