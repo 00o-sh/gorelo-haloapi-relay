@@ -28,6 +28,7 @@ import { haloCredentials, ipAllowed, matchProduct, type Product } from "./produc
 import { haloPriority, haloStatus, haloTeam, haloTicketType } from "./haloShapes.js";
 import { signToken, verifyTokenResult, type TokenPayload } from "../core/token.js";
 import { emitTicketCreated, emitTicketResolved } from "../core/events.js";
+import { notiflyUrls } from "../core/notify.js";
 import { decodeEntities, esc, heading, htmlToText, num, str } from "./html.js";
 import {
   mapperFor,
@@ -914,6 +915,7 @@ async function handleCreateTicket(
           contactId: routing.contactId,
           deviceAssetIds: routing.agentAssetIds,
           subject: cmd.title,
+          descriptionText: htmlToText(cmd.description ?? ""),
           timestamp: nowIso(),
         },
         { env, ctx },
@@ -1131,14 +1133,6 @@ async function handleActions(env: Env, ctx: ExecutionContext | undefined, body: 
     }
     throw err;
   }
-}
-
-/** Parse the configured notifly (Apprise) URLs — comma / whitespace / newline separated. */
-export function notiflyUrls(env: Env): string[] {
-  return (env.NOTIFLY_URLS ?? "")
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
 }
 
 /**

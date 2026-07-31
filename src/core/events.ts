@@ -72,6 +72,12 @@ export interface TicketCreatedEvent {
   readonly deviceAssetIds: readonly string[];
   /** Ticket subject/title (the Gorelo command's title). ALWAYS present. */
   readonly subject: string;
+  /**
+   * The ticket body flattened to plain text (the Gorelo HTML description run through
+   * htmlToText at emit time). A neutral, sink-agnostic representation — a sink that
+   * wants rich text re-renders from this. May be empty when the ticket had no body.
+   */
+  readonly descriptionText: string;
   /** ISO-8601 timestamp of emission. */
   readonly timestamp: string;
 }

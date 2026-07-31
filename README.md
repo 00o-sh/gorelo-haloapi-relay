@@ -52,21 +52,32 @@ Cron (every 6h) / POST /admin/sync / first-call bootstrap ──▶ syncAll() de
 
 ## Project layout
 
+The source is split into **core** (shared), **ingress** (inbound: the Halo mock) and
+**egress** (outbound: fan-out sinks). The one rule: **ingress/ and egress/ never import
+each other** — both import core/, and they meet only through `core/events.ts` (wired in
+`index.ts`). A CI check (`npm run lint:boundaries`) fails the build on any crossing import.
+
 | Path | Purpose |
 |---|---|
-| `src/index.ts` | `fetch` + `scheduled` handlers, routing (admin/health/Halo) |
-| `src/halo.ts` | the HaloPSA mock — token, lookups, per-product create, report parsing |
-| `src/products.ts` | product registry (`PRODUCTS`, IPs/CIDRs, `ENABLE_*`, UA gate, per-product OAuth creds, `matchProduct`, `haloCredentials`, `ipAllowed`) |
-| `src/haloShapes.ts` | full Halo config-item shapes (status/type/priority/team), field lists derived from the swagger |
-| `src/gorelo.ts` | Gorelo API client (retry/backoff, defensive parsing) |
-| `src/sync.ts` | `syncAll()` — rebuild the D1 mirror off the request path |
-| `src/db.ts` | D1 schema + point lookups (+ the deferred-ticket queue) |
-| `src/parse.ts` | small string normalizers (`normalizeHost`, `normalizeEmail`) |
-| `src/types.ts` | `Env` + hand-written subset of Gorelo API types |
+| `src/index.ts` | `fetch` + `scheduled` + `queue` handlers, routing; registers egress subscribers with the event spine |
+| `src/core/events.ts` | the internal event spine — `TicketCreatedEvent`/`TicketResolvedEvent` + subscriber registry (the ingress→egress contract) |
+| `src/core/gorelo.ts` | Gorelo API client (retry/backoff, defensive parsing) |
+| `src/core/db.ts` | D1 schema + point lookups (+ the deferred-ticket queue + the Jira retry queue) |
+| `src/core/parse.ts` | small string normalizers (`normalizeHost`, `normalizeEmail`) |
+| `src/core/notify.ts` | `notiflyUrls` — parse the notifly alert URLs (shared by every dead-letter path) |
+| `src/core/log.ts` / `token.ts` / `types.ts` | logging chokepoint / signed bearer tokens / `Env` + Gorelo API types |
+| `src/ingress/halo.ts` | the HaloPSA mock — token, lookups, per-product create, resolution; emits ticket events |
+| `src/ingress/html.ts` | shared product-agnostic HTML/text render + parse helpers |
+| `src/ingress/mappers/` | per-product `ProductMapper` seam (`helpdeskButtons` mapper — HDB report table + free-text) |
+| `src/ingress/products.ts` | product registry (`PRODUCTS`, IPs/CIDRs, `ENABLE_*`, UA gate, per-product OAuth creds + mapper) |
+| `src/ingress/haloShapes.ts` | full Halo config-item shapes (status/type/priority/team), from the swagger |
+| `src/ingress/sync.ts` | `syncAll()` — rebuild the D1 mirror off the request path |
+| `src/egress/jira/` | the Jira fan-out — a `TicketEventSubscriber` + dependency-free Jira Cloud client + `pending_jira` drain |
 | `docs/halo-swagger.v2.json` | the real HaloPSA OpenAPI spec — reference for shaping mock responses |
-| `migrations/0001_init.sql` | D1 schema (also self-created at runtime) |
+| `migrations/0001_init.sql` / `0002_jira_fanout.sql` | D1 schema (also self-created at runtime) |
 | `scripts/gorelo-ids.sh` | dump groups/types/statuses/clients to fill the vars |
-| `scripts/halo-cred.sh` / `.ps1` | generate a per-product Halo OAuth pair, push the secret via `wrangler secret put`, print the creds (Bash and PowerShell) |
+| `scripts/halo-cred.sh` / `.ps1` | generate a per-product Halo OAuth pair, push the secret, print the creds |
+| `scripts/check-import-boundaries.mjs` | the ingress↔egress boundary check (CI + `npm run lint:boundaries`) |
 | `test/` | vitest specs (`@cloudflare/vitest-pool-workers`) |
 
 ## Deploy
@@ -329,6 +340,60 @@ product's token can't authorize another's request. A product whose pair is **uns
 stays lenient (any creds accepted, no enforcement), so products can be onboarded /
 rolled out independently. Generate a pair and push its secret with
 `./scripts/halo-cred.sh <product>` (or `./scripts/halo-cred.ps1 <product>` on Windows).
+
+## Jira output (egress)
+
+An optional **egress** sink (`src/egress/jira/`) mirrors created tickets into a
+co-managed client's own **Jira Cloud** and closes the linked Jira issue when the ticket
+resolves. Gorelo stays the system of record; Jira is a mirror.
+
+It is a subscriber to the internal event spine (`core/events.ts`), not wired into the
+Halo path: when the relay creates a Gorelo ticket it emits a `TicketCreatedEvent`, and
+on a resolution a `TicketResolvedEvent`. The Jira module reacts only to those events —
+it has no knowledge of Halo, Huntress, or any ticket source; it knows only that a ticket
+event occurred for some Gorelo client, carrying a product key. A create failure is queued
+in `pending_jira` and retried by the `*/5` cron (`flushPendingJira`), with a ledger-key
+dedup guard and a notifly dead-letter after repeated failures. **A Jira problem never
+delays or fails the Halo response or the Gorelo create.**
+
+Enable it with two settings:
+
+```toml
+# wrangler.toml [vars] — master switch (default off)
+ENABLE_JIRA = "true"
+```
+
+```bash
+# secret — one entry per ENROLLED Gorelo client (a client with no entry is never sent)
+wrangler secret put JIRA_TARGETS
+# [{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC",
+#   "issueType":"Task","email":"svc@acme.com","apiToken":"…","resolvedTransition":"Done"}]
+```
+
+### Testing against a free Jira Cloud site (no production Jira needed)
+
+1. Create a free Jira Cloud site at <https://www.atlassian.com/software/jira/free>
+   (`https://<you>.atlassian.net`) and a project (note its **project key**, e.g. `SEC`).
+2. Create an API token at <https://id.atlassian.com/manage-profile/security/api-tokens>.
+3. Point `JIRA_TARGETS` at that site, keyed by a **Gorelo `clientId` you can trigger a
+   ticket for**: `baseUrl` = your site URL, `projectKey` = your project, `email` = your
+   Atlassian login, `apiToken` = the token, `issueType` = a type your project has (e.g.
+   `Task`), `resolvedTransition` = a transition name from your workflow (e.g. `Done`).
+   Set `ENABLE_JIRA="true"`.
+4. Drive a ticket for that client (a Tier2 press / Huntress alert, or a create in `wrangler
+   dev`) → a Jira issue should appear, labelled with the product key + `gorelo-<number>`.
+   Resolve it (Huntress resolution edit) → the issue gets a resolution comment and, if the
+   `resolvedTransition` matches an available transition, moves to that status.
+
+The three Jira REST calls the fan-out makes — and which are still **only mock-verified**
+(the automated tests stub every Jira request) and need a live site to confirm the real
+API accepts our bodies:
+
+| Call | Jira endpoint | Verified by tests | Needs live check |
+|---|---|---|---|
+| Create issue | `POST /rest/api/3/issue` (ADF description) | mock only | ✅ yes |
+| Add comment | `POST /rest/api/3/issue/{key}/comment` (ADF body) | mock only | ✅ yes |
+| Transition | `GET` + `POST /rest/api/3/issue/{key}/transitions` | mock only | ✅ yes |
 
 ## Data store & refresh
 
