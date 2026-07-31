@@ -1,9 +1,9 @@
-import { getLastSync, getSyncMeta, initSchema, mirrorCounts, setSyncMeta } from "./db.js";
-import { GoreloClient } from "./gorelo.js";
-import { flushPendingTickets, handleHalo, isHaloRequest, postSyncFailure, testNotifly } from "./halo.js";
-import { breadcrumb, describeError } from "./log.js";
-import { reconcileClientLocations, syncAll } from "./sync.js";
-import type { Env, SyncLocationsMessage } from "./types.js";
+import { getLastSync, getSyncMeta, initSchema, mirrorCounts, setSyncMeta } from "./core/db.js";
+import { GoreloClient } from "./core/gorelo.js";
+import { flushPendingTickets, handleHalo, isHaloRequest, postSyncFailure, testNotifly } from "./ingress/halo.js";
+import { breadcrumb, describeError } from "./core/log.js";
+import { reconcileClientLocations, syncAll } from "./ingress/sync.js";
+import type { Env, SyncLocationsMessage } from "./core/types.js";
 
 // The 6-hourly mirror-refresh cron (must match wrangler.toml [triggers].crons).
 // Any other cron firing is treated as the frequent orphaned-ticket flush.

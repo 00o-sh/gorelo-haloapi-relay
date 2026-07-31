@@ -18,22 +18,22 @@ import {
   type ContactRow,
   type CreatedTicketRow,
   type DeviceFullRow,
-} from "./db.js";
+} from "../core/db.js";
 import { notify } from "@ambersecurityinc/notifly";
-import { GoreloClient, GoreloError, extractTicketNumber } from "./gorelo.js";
-import { breadcrumb, debug, debugOn, describeError } from "./log.js";
-import { normalizeEmail, normalizeHost } from "./parse.js";
+import { GoreloClient, GoreloError, extractTicketNumber } from "../core/gorelo.js";
+import { breadcrumb, debug, debugOn, describeError } from "../core/log.js";
+import { normalizeEmail, normalizeHost } from "../core/parse.js";
 import { assetNum, syncAll } from "./sync.js";
 import { haloCredentials, ipAllowed, matchProduct, type Product } from "./products.js";
 import { haloPriority, haloStatus, haloTeam, haloTicketType } from "./haloShapes.js";
-import { signToken, verifyTokenResult, type TokenPayload } from "./token.js";
+import { signToken, verifyTokenResult, type TokenPayload } from "../core/token.js";
 import type {
   CreatePublicTicketCommand,
   Env,
   PublicDeviceResponse,
   PublicTicketPriority,
   TicketSource,
-} from "./types.js";
+} from "../core/types.js";
 
 /**
  * HaloPSA/HaloITSM mock — PHASE 2 (Gorelo-backed).

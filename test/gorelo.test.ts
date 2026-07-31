@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractTicketNumber, retryDelayMs } from "../src/gorelo.js";
+import { extractTicketNumber, retryDelayMs } from "../src/core/gorelo.js";
 
 describe("extractTicketNumber", () => {
   it("reads the live create-response `id` field", () => {

@@ -1,5 +1,5 @@
-import { breadcrumb } from "./log.js";
-import type { Env } from "./types.js";
+import { breadcrumb } from "../core/log.js";
+import type { Env } from "../core/types.js";
 
 /**
  * A source product whose Halo integration posts into this relay. Access is
