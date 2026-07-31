@@ -9,6 +9,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
+    "lint:boundaries": "node scripts/check-import-boundaries.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
