@@ -8,7 +8,13 @@
       "version": "26.5.1"
     }
   },
-  // `wrangler dev` serves the Worker here; forward it so the host browser/curl can reach it.
+  // Publish the container's 8787 to the HOST on 0.0.0.0 (Docker `-p 8787:8787`), so
+  // OTHER devices on the LAN can reach it at http://<host-LAN-IP>:8787. This is a real
+  // Docker port publish (unlike `forwardPorts`, which only binds the host's localhost).
+  // NOTE: run the Worker with `npm run dev:lan` so wrangler listens on 0.0.0.0 inside
+  // the container — a localhost bind won't receive the published traffic. (appPort is
+  // a local-Docker feature; in Codespaces use port visibility "public" instead.)
+  "appPort": ["8787:8787"],
   "forwardPorts": [8787],
   "portsAttributes": {
     "8787": {
@@ -16,11 +22,14 @@
       "onAutoForward": "notify"
     }
   },
-  // Install deps on create. DB setup + `wrangler dev` are left to the developer
-  // (they need a .dev.vars first) — see README "Local development".
   "postCreateCommand": "npm ci",
   "customizations": {
     "vscode": {
+      // Make VS Code's own port forwarding bind to all interfaces (LAN-reachable)
+      // too, not just the host's localhost — belt-and-suspenders alongside appPort.
+      "settings": {
+        "remote.localPortHost": "allInterfaces"
+      },
       "extensions": [
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
