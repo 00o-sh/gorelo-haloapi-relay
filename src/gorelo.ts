@@ -2,6 +2,7 @@ import { breadcrumb } from "./log.js";
 import type {
   CreatePublicTicketCommand,
   Env,
+  PostAlertRequest,
   PublicClientLocationResponse,
   PublicClientResponse,
   PublicContactResponse,
@@ -304,6 +305,24 @@ export class GoreloClient {
     );
     // Enveloped list (single page — no cursor param on this endpoint): rows are Data.
     return asArray<PublicClientLocationResponse>(unwrap(raw).data);
+  }
+
+  /**
+   * POST /v1/alerts/ — Gorelo's native external-alert endpoint. Throws GoreloError
+   * (with upstream status + notification code) on non-2xx so the handler can return
+   * 502. The response is a boolean success envelope with no id, so there's nothing to
+   * return — success is "did not throw". Body is pascalized like the ticket create.
+   */
+  async postAlert(req: PostAlertRequest): Promise<void> {
+    const res = await this.request("/v1/alerts/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rekey(req, pascalKey)),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw GoreloError.fromBody("POST /v1/alerts/ failed", res.status, body);
+    }
   }
 
   /**

@@ -357,32 +357,32 @@ never validates it against a list. A SQL-server monitor might send e.g.
 ### Behavior (deduplication)
 
 `dedupe_key` is the stable identity for an alert; the Worker tracks its lifecycle in
-the `alerts` D1 table so a retrying monitor never opens duplicate tickets.
+the `alerts` D1 table so a retrying monitor never re-raises the same alert.
 
 | `status` | Existing state | Action | Gorelo effect |
 |---|---|---|---|
-| `triggered` | none / previously resolved | `created` | creates **one** Gorelo ticket |
-| `triggered` | open, new event | `updated` | updates the stored alert — **no** second ticket |
+| `triggered` | none / previously resolved | `created` | posts **one** Gorelo alert (`POST /v1/alerts/`) |
+| `triggered` | open, new event | `updated` | updates the stored alert — **no** re-post |
 | `triggered` | open, same `Idempotency-Key`/`event_id` | `duplicate-ignored` | nothing |
-| `resolved` | open | `resolved` | files a labeled **resolution notice** ticket (resolved status), marks the alert resolved |
-| `resolved` | none / already resolved | `duplicate-ignored` | nothing (success, no ticket) |
-| `heartbeat` | — | `heartbeat-recorded` | stamps `last_seen` in `alert_heartbeats`, **no** ticket |
+| `resolved` | open | `resolved` | posts a `Resolved: …` Gorelo alert, marks the stored alert resolved |
+| `resolved` | none / already resolved | `duplicate-ignored` | nothing (success, no post) |
+| `heartbeat` | — | `heartbeat-recorded` | stamps `last_seen` in `alert_heartbeats`, **no** post |
 
 ### Response
 
 `202 Accepted` (a `200` is equally valid — Gorelo confirms synchronously here):
 
 ```json
-{ "accepted": true, "action": "created", "dedupe_key": "DB-SERVER-01:daily-restore", "remote_id": "T-5001" }
+{ "accepted": true, "action": "created", "dedupe_key": "DB-SERVER-01:daily-restore" }
 ```
 
 `action` ∈ `created | updated | resolved | heartbeat-recorded | duplicate-ignored`.
-`remote_id` is the Gorelo ticket's display number (else its number, else its GUID),
-present when a ticket exists. Errors return `{ "accepted": false, "error": "…" }` with:
-`400` invalid JSON / missing or bad field · `401` invalid shared secret · `403` source
-IP not allowed · `405` method other than `POST` · `502` Gorelo rejected/unavailable ·
-`500` unexpected. (`429` is reserved in the contract for rate limiting; the Worker does
-not currently throttle.)
+(No `remote_id`: Gorelo's alert endpoint returns a boolean success with no alert id — see
+the mapping below.) Errors return `{ "accepted": false, "error": "…" }` with: `400`
+invalid JSON / missing or bad field · `401` invalid shared secret · `403` source IP not
+allowed · `405` method other than `POST` · `502` Gorelo rejected/unavailable · `500`
+unexpected. (`429` is reserved in the contract for rate limiting; the Worker does not
+currently throttle.)
 
 ### Retry & idempotency
 
@@ -394,26 +394,25 @@ leaves the alert **unstored/open**, so a retry re-attempts the Gorelo write clea
 
 ### Gorelo mapping
 
-There is no separate "alert" object in Gorelo — an alert maps to a **ticket** via
-`POST /v1/tickets` (`CreatePublicTicketCommand`), the same primitive the Halo mock uses:
+Events map to Gorelo's **native alert** endpoint — `POST /v1/alerts/` (`PostAlertRequest`,
+*"Posts an external alert against a client"*) — **not** a service ticket:
 
-| Alert field | Gorelo ticket field |
+| Alert field | Gorelo alert field (`PostAlertRequest`) |
 |---|---|
-| `title` | `title` |
-| `source` | `createdByName` |
-| `message` + `details` + metadata (host/monitor/severity/timestamp/`dedupe_key`) | `description` (HTML) |
-| `severity` | `priorityId` — `critical`→`ALERT_PRIORITY_CRITICAL`\|`EMERGENCY_PRIORITY`\|1, `warning`→`ALERT_PRIORITY_WARNING`\|`DEFAULT_PRIORITY`\|2, `info`→`ALERT_PRIORITY_INFO`\|4 |
-| `customer` / `host` | `clientId` — `ALERT_CLIENT_ID`, else `customer` matched by exact name against the client mirror, else a mirrored device matched by `host`, else `CATCHALL_CLIENT_ID`; a `host` match also attaches the Gorelo **agent asset** and its location |
-| (fixed) | `groupId`=`DEFAULT_GROUP_ID`, `typeId`=`DEFAULT_TYPE_ID`, `sourceId`=`DEFAULT_SOURCE`, `statusId`=`DEFAULT_STATUS_ID` (resolution notice → `DEFAULT_RESOLVED_STATUS_ID`), `tagIds`=`ALERT_TAG_ID`\|`FALLBACK_TAG_ID`, `sendTicketCreatedEmail`=false |
+| `title` | `Name` |
+| `host` | `Resource` (the host/service the alert is raised for) |
+| `severity` | `Severity` (`AlertLevel` int 1–4) — `info`→`ALERT_LEVEL_INFO`\|1, `warning`→`ALERT_LEVEL_WARNING`\|2, `critical`→`ALERT_LEVEL_CRITICAL`\|3. **TODO(verify)** which int is which in the Gorelo UI (unlabeled enum) |
+| `message` + `details` + metadata (monitor/source/customer/timestamp/`dedupe_key`) | `Description` (plain text) |
+| `customer` / `host` | `ClientId` — `ALERT_CLIENT_ID`, else `customer` matched by exact name against the client mirror, else a mirrored device matched by `host`, else `CATCHALL_CLIENT_ID` |
 
-**Does Gorelo resolve/dedupe by a stored remote id or key?** No. Gorelo's public API is
-**create-only** for tickets (`POST`/`GET /v1/tickets`, no update or close endpoint), so
-it offers no server-side dedup key and no way to close a ticket by id. Deduplication and
-the open→resolved transition are therefore owned by **this Worker**: the `dedupe_key`→
-ticket association lives in D1, and a `resolved` event files a clearly-labeled resolution
-notice referencing the original ticket (which a tech closes manually) — the same pattern
-the Halo/Huntress resolution path uses. `remote_id` is echoed back purely for the
-caller's correlation/logging; you never send it back to resolve.
+**Does Gorelo resolve/dedupe by a stored remote id or key?** No. Gorelo **does** have a
+native alert endpoint (`POST /v1/alerts/`), but it is **create-only** — the response is a
+boolean success envelope with **no alert id**, and there is no update/close/GET for
+alerts. So Gorelo offers no server-side dedup key and no way to clear an alert by id.
+Deduplication and the open→resolved lifecycle are therefore owned by **this Worker**: the
+`dedupe_key` state lives in D1; a repeat `triggered` updates that row without re-posting;
+and a `resolved` event posts a fresh `Resolved: …` alert to signal the clear (there is
+nothing to send back to Gorelo to close the original).
 
 ### Configuration
 

@@ -7,9 +7,11 @@ const HOST = "https://relay.example.com";
 const SECRET = "alert-test-secret"; // matches vitest.config.ts ALERT_SHARED_SECRET
 
 // --- outbound Gorelo fetch stub ---------------------------------------------
+// The relay posts to Gorelo's native alert endpoint POST /v1/alerts/ (returns a
+// boolean success envelope, no id). `alertPosts` counts those; `failCreate` makes it 5xx.
 let realFetch: typeof fetch;
-let createCalls = 0;
-let lastId = "";
+let alertPosts = 0;
+let lastAlertBody: Record<string, unknown> | null = null;
 let failCreate = false;
 
 beforeAll(() => {
@@ -23,20 +25,19 @@ const json = (status: number, data: unknown): Response =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 
 function installFetch(): void {
-  createCalls = 0;
-  lastId = "";
+  alertPosts = 0;
+  lastAlertBody = null;
   failCreate = false;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const req = new Request(input as RequestInfo, init);
     const url = new URL(req.url);
-    if (req.method === "POST" && url.pathname === "/v1/tickets") {
-      if (failCreate) return new Response("boom", { status: 500 });
-      createCalls += 1;
-      lastId = `uuid-${createCalls}`;
-      return json(200, { id: lastId });
-    }
-    if (req.method === "GET" && url.pathname === "/v1/tickets") {
-      return json(200, { data: [{ id: lastId, number: 5000 + createCalls, displayNumber: `T-${5000 + createCalls}` }] });
+    if (req.method === "POST" && url.pathname === "/v1/alerts/") {
+      if (failCreate) {
+        return json(500, { StatusCode: 500, IsSuccess: false, Data: null, Notifications: [{ Code: "500000", Message: "boom" }] });
+      }
+      alertPosts += 1;
+      lastAlertBody = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+      return json(200, { StatusCode: 200, IsSuccess: true, Data: true });
     }
     throw new Error(`unmocked fetch: ${req.method} ${url.pathname}`);
   }) as typeof fetch;
@@ -151,23 +152,24 @@ describe("POST /v1/alerts — validation", () => {
 });
 
 describe("POST /v1/alerts — triggered & dedup", () => {
-  it("creates one Gorelo ticket and stores the alert (action=created)", async () => {
+  it("posts one Gorelo alert and stores it (action=created)", async () => {
     const res = await post(baseAlert());
     expect(res.status).toBe(202);
     const b = await body(res);
-    expect(b).toMatchObject({ accepted: true, action: "created", dedupe_key: "DB-SERVER-01:daily-restore" });
-    expect(b.remote_id).toBe("T-5001");
-    expect(createCalls).toBe(1);
+    expect(b).toEqual({ accepted: true, action: "created", dedupe_key: "DB-SERVER-01:daily-restore" });
+    expect(alertPosts).toBe(1);
+    // The native Gorelo alert payload (pascalized): Name/ClientId/Resource.
+    expect(lastAlertBody).toMatchObject({ Name: "Daily restore failed", Resource: "DB-SERVER-01", ClientId: 999 });
     const row = await alertRow("DB-SERVER-01:daily-restore");
-    expect(row).toMatchObject({ status: "open", severity: "critical", display_number: "T-5001" });
+    expect(row).toMatchObject({ status: "open", severity: "critical" });
   });
 
-  it("updates the open alert without a second ticket (action=updated)", async () => {
+  it("updates the open alert without re-posting (action=updated)", async () => {
     await post(baseAlert());
     const res = await post(baseAlert({ event_id: "later-event", message: "still failing" }));
     expect(res.status).toBe(202);
     expect((await body(res)).action).toBe("updated");
-    expect(createCalls).toBe(1); // no second create
+    expect(alertPosts).toBe(1); // no second create
     const row = await alertRow("DB-SERVER-01:daily-restore");
     expect(row?.message).toBe("still failing");
   });
@@ -177,49 +179,50 @@ describe("POST /v1/alerts — triggered & dedup", () => {
     const res = await post(baseAlert({ message: "changed but same key" }), { "Idempotency-Key": "evt-1" });
     expect(res.status).toBe(202);
     expect((await body(res)).action).toBe("duplicate-ignored");
-    expect(createCalls).toBe(1);
+    expect(alertPosts).toBe(1);
     const row = await alertRow("DB-SERVER-01:daily-restore");
     expect(row?.message).toBe("The daily transaction-log restore failed after all retry attempts.");
   });
 });
 
 describe("POST /v1/alerts — resolved", () => {
-  it("files a resolution notice and marks the alert resolved (action=resolved)", async () => {
+  it("posts a resolved alert and marks the alert resolved (action=resolved)", async () => {
     await post(baseAlert());
-    expect(createCalls).toBe(1);
+    expect(alertPosts).toBe(1);
     const res = await post(baseAlert({ status: "resolved", event_id: "resolve-1" }));
     expect(res.status).toBe(202);
     expect((await body(res)).action).toBe("resolved");
-    expect(createCalls).toBe(2); // the resolution notice
+    expect(alertPosts).toBe(2); // the "Resolved: …" alert
+    expect(lastAlertBody).toMatchObject({ Name: "Resolved: Daily restore failed" });
     const row = await alertRow("DB-SERVER-01:daily-restore");
     expect(row?.status).toBe("resolved");
     expect(row?.resolved_at).toBeTruthy();
   });
 
-  it("returns success without creating anything when nothing is open", async () => {
+  it("returns success without posting anything when nothing is open", async () => {
     const res = await post(baseAlert({ status: "resolved", dedupe_key: "unknown:key" }));
     expect(res.status).toBe(202);
     expect((await body(res)).action).toBe("duplicate-ignored");
-    expect(createCalls).toBe(0);
+    expect(alertPosts).toBe(0);
   });
 
-  it("re-triggering after a resolve opens a fresh ticket", async () => {
+  it("re-triggering after a resolve posts a fresh alert", async () => {
     await post(baseAlert());
     await post(baseAlert({ status: "resolved", event_id: "r1" }));
     const res = await post(baseAlert({ event_id: "t2" }));
     expect((await body(res)).action).toBe("created");
-    expect(createCalls).toBe(3);
+    expect(alertPosts).toBe(3);
     const row = await alertRow("DB-SERVER-01:daily-restore");
     expect(row?.status).toBe("open");
   });
 });
 
 describe("POST /v1/alerts — heartbeat", () => {
-  it("records a heartbeat without creating a ticket (action=heartbeat-recorded)", async () => {
+  it("records a heartbeat without posting an alert (action=heartbeat-recorded)", async () => {
     const res = await post(baseAlert({ monitor_id: "heartbeat", status: "heartbeat", dedupe_key: "DB-SERVER-01:heartbeat" }));
     expect(res.status).toBe(202);
     expect((await body(res)).action).toBe("heartbeat-recorded");
-    expect(createCalls).toBe(0);
+    expect(alertPosts).toBe(0);
     const hb = await env.DB.prepare(`SELECT * FROM alert_heartbeats WHERE dedupe_key = ?`).bind("DB-SERVER-01:heartbeat").first();
     expect(hb?.last_seen).toBeTruthy();
     expect(await alertRow("DB-SERVER-01:heartbeat")).toBeNull();
@@ -227,7 +230,7 @@ describe("POST /v1/alerts — heartbeat", () => {
 });
 
 describe("POST /v1/alerts — Gorelo failure", () => {
-  it("502 and no stored alert when the Gorelo create is rejected", async () => {
+  it("502 and no stored alert when the Gorelo post is rejected", async () => {
     failCreate = true;
     const res = await post(baseAlert());
     expect(res.status).toBe(502);

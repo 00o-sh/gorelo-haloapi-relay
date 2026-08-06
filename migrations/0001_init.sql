@@ -57,9 +57,11 @@ CREATE TABLE IF NOT EXISTS pending_tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_tickets (created_at);
 
--- Monitoring alerts (POST /v1/alerts). One row per stable `dedupe_key`; `status` is
--- our own 'open'|'resolved' lifecycle (Gorelo has no ticket-update/close API), and
--- `last_event_id` is the last processed Idempotency-Key/event_id for replay safety.
+-- Monitoring alerts (POST /v1/alerts -> Gorelo's native POST /v1/alerts/). One row per
+-- stable `dedupe_key`; `status` is our own 'open'|'resolved' lifecycle (Gorelo's alert
+-- API is create-only — no id/close), and `last_event_id` is the last processed
+-- Idempotency-Key/event_id for replay safety. gorelo_id/number/display_number are legacy
+-- (unused for native alerts) and left null.
 CREATE TABLE IF NOT EXISTS alerts (
   dedupe_key     TEXT PRIMARY KEY,
   monitor_id     TEXT,

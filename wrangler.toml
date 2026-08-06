@@ -133,7 +133,8 @@ DEBUG_LOGS = "false"
 
 # --- Monitoring alerts endpoint (POST /v1/alerts) ---------------------------------
 # A generic HTTPS ingress for monitoring sources (e.g. an on-prem Windows/SQL Server)
-# to raise/update/resolve alerts in Gorelo. Each "source" (a customer) is TWO-FACTOR:
+# to raise/update/resolve Gorelo native alerts (POST /v1/alerts/ — an alert, not a
+# ticket; the relay owns dedup + lifecycle). Each "source" (a customer) is TWO-FACTOR:
 # it has its own shared secret bound to its own IP allowlist, so a request must present
 # that source's secret AND come from that source's IP(s) — a wrong secret is 401, a
 # valid secret from the wrong IP is 403. See README "Monitoring alerts".
@@ -154,16 +155,16 @@ ALERT_ALLOWED_IPS = ""
 # Per-customer source IP allowlists (paired with the ALERT_SECRET_<KEY> secret). Each is
 # a LIST — any mix of exact IPs and IPv4 CIDR ranges/subnets, comma/space/newline separated:
 # ALERT_IPS_ACME = "203.0.113.7, 198.51.100.0/24, 192.0.2.0/28"
-# Optional Gorelo client id alert tickets are filed under. Unset => the alert's
-# `customer` is matched by exact name against the client mirror, else CATCHALL_CLIENT_ID.
+# Optional Gorelo client id alerts are raised against (PostAlertRequest.ClientId).
+# Unset => the alert's `customer` is matched by exact name against the client mirror,
+# then the `host` against a mirrored device, else CATCHALL_CLIENT_ID.
 # ALERT_CLIENT_ID = "15567"
-# Optional Gorelo tag id applied to alert tickets. Unset => FALLBACK_TAG_ID.
-# ALERT_TAG_ID = "32885"
-# Optional per-severity Gorelo priority overrides. Unset => critical -> EMERGENCY_PRIORITY|1,
-# warning -> DEFAULT_PRIORITY|2, info -> 4 (PublicTicketPriority enum [0..4]).
-# ALERT_PRIORITY_CRITICAL = "1"
-# ALERT_PRIORITY_WARNING = "2"
-# ALERT_PRIORITY_INFO = "4"
+# Optional per-severity Gorelo AlertLevel overrides (the int Severity on the alert).
+# Unset => info->1, warning->2, critical->3. AlertLevel is an unlabeled 1–4 enum —
+# TODO(verify) which int is which level in the Gorelo UI.
+# ALERT_LEVEL_CRITICAL = "3"
+# ALERT_LEVEL_WARNING = "2"
+# ALERT_LEVEL_INFO = "1"
 
 # Bearer-token enforcement on the Halo resource endpoints (audit F1). Only takes
 # effect when BOTH HALO_CLIENT_ID and HALO_CLIENT_SECRET secrets are set; the

@@ -1,9 +1,9 @@
-import { findDeviceFullByHostname, getAlert, initSchema, listClientRows, putAlert, recordHeartbeat, type AlertRow } from "./db.js";
-import { GoreloClient, GoreloError, extractTicketNumber } from "./gorelo.js";
+import { findDeviceFullByHostname, getAlert, initSchema, listClientRows, putAlert, recordHeartbeat } from "./db.js";
+import { GoreloClient, GoreloError } from "./gorelo.js";
 import { breadcrumb, debug, describeError } from "./log.js";
 import { normalizeHost } from "./parse.js";
 import { ipInCidr } from "./products.js";
-import type { CreatePublicTicketCommand, Env, PublicTicketPriority, TicketSource } from "./types.js";
+import type { AlertLevel, Env, PostAlertRequest } from "./types.js";
 
 /**
  * Monitoring alert relay — POST /v1/alerts.
@@ -12,18 +12,19 @@ import type { CreatePublicTicketCommand, Env, PublicTicketPriority, TicketSource
  * Server) to raise, update, and resolve alerts in Gorelo through this IP-allowlisted
  * proxy. Requests are gated by source IP (CF-Connecting-IP) AND a shared secret
  * (Authorization: Bearer or X-Alert-Key), then deduplicated by `dedupe_key` so a
- * retrying monitor never opens duplicate tickets.
+ * retrying monitor never re-raises the same alert.
  *
- * Gorelo has no ticket-update/close API (the same constraint the Halo path works
- * around), so the alert lifecycle is tracked in D1: a `triggered` event creates ONE
- * Gorelo ticket and remembers it by `dedupe_key`; repeats update the stored alert
- * without a second ticket; a `resolved` event files a labeled resolution notice and
- * marks the stored alert resolved. `heartbeat` events only stamp last-seen.
+ * Events map to Gorelo's NATIVE alert endpoint (POST /v1/alerts/) — an alert, not a
+ * service ticket. That endpoint is create-only (no id, no update/close), so the relay
+ * owns the lifecycle in D1: a `triggered` event posts ONE Gorelo alert and remembers
+ * it by `dedupe_key`; repeats update the stored row WITHOUT re-posting; a `resolved`
+ * event posts a "Resolved: …" alert and marks the stored row resolved; `heartbeat`
+ * events only stamp last-seen (no Gorelo call).
  */
 
 // The alert lifecycle statuses a source may send.
 const STATUSES = new Set(["triggered", "resolved", "heartbeat"]);
-// Severities we map to a Gorelo priority.
+// Severities we map to a Gorelo AlertLevel.
 const SEVERITIES = new Set(["info", "warning", "critical"]);
 
 // Required top-level string fields on every alert (all must be present & non-empty).
@@ -225,162 +226,103 @@ function validateAlert(parsed: unknown): { alert: Alert } | { error: string } {
   };
 }
 
-// --- Gorelo mapping ---------------------------------------------------------
+// --- Gorelo mapping (native alerts: POST /v1/alerts/) -----------------------
 
-/** Map an alert severity to the closest Gorelo priority (overridable per severity). */
-function alertPriority(env: Env, severity: string): PublicTicketPriority {
-  const pick = (v: string | undefined, fallback: number): number => {
+/**
+ * Map an alert severity to Gorelo's AlertLevel (unlabeled int 1–4). Default
+ * info->1, warning->2, critical->3; overridable via ALERT_LEVEL_{INFO,WARNING,
+ * CRITICAL}. TODO(verify): confirm which int is which level in the Gorelo UI.
+ */
+function alertLevel(env: Env, severity: string): AlertLevel {
+  const pick = (v: string | undefined, fallback: number): AlertLevel => {
     const n = Number(v);
-    return Number.isFinite(n) ? n : fallback;
+    return (Number.isInteger(n) && n >= 1 && n <= 4 ? n : fallback) as AlertLevel;
   };
   switch (severity) {
     case "critical":
-      return pick(env.ALERT_PRIORITY_CRITICAL, pick(env.EMERGENCY_PRIORITY, 1)) as PublicTicketPriority;
+      return pick(env.ALERT_LEVEL_CRITICAL, 3);
     case "warning":
-      return pick(env.ALERT_PRIORITY_WARNING, pick(env.DEFAULT_PRIORITY, 2)) as PublicTicketPriority;
+      return pick(env.ALERT_LEVEL_WARNING, 2);
     default: // info
-      return pick(env.ALERT_PRIORITY_INFO, 4) as PublicTicketPriority;
+      return pick(env.ALERT_LEVEL_INFO, 1);
   }
 }
 
-/** Gorelo tag ids for an alert ticket: ALERT_TAG_ID, else the catch-all FALLBACK_TAG_ID. */
-function alertTagIds(env: Env): number[] | undefined {
-  const n = Number(env.ALERT_TAG_ID ?? env.FALLBACK_TAG_ID);
-  return Number.isFinite(n) && n > 0 ? [n] : undefined;
-}
-
-const FIELD_MAX = 2000;
-const esc = (s: string): string =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const FIELD_MAX = 4000;
 const truncate = (s: string): string =>
   s.length > FIELD_MAX ? `${s.slice(0, FIELD_MAX)}… [truncated ${s.length - FIELD_MAX} chars]` : s;
-const heading = (s: string): string => `<b>${esc(s)}</b>`;
 
-/** Render the alert `details` object as readable `key: value` lines. */
+/** The alert `details` object rendered as plain `key: value` lines. */
 function detailLines(details: Record<string, unknown> | null): string[] {
   if (!details) return [];
   const out: string[] = [];
   for (const [k, v] of Object.entries(details)) {
     if (v == null || v === "") continue;
-    const rendered = typeof v === "object" ? JSON.stringify(v) : String(v);
-    out.push(`${esc(k)}: ${esc(truncate(rendered))}`);
+    out.push(`${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`);
   }
   return out;
 }
 
-/** Build the Gorelo ticket description (HTML — Gorelo renders it) from an alert. */
+/**
+ * Build the Gorelo alert Description (free text): the message, then the alert's
+ * metadata and detail fields, so the alert carries full context. Plain text — the
+ * alerts endpoint takes a description string, not HTML.
+ */
 function buildDescription(alert: Alert): string {
-  const meta = [
-    `Severity: ${esc(alert.severity.toUpperCase())} · Status: ${esc(alert.status)}`,
-    `Monitor: ${esc(alert.monitor_id)}`,
-    `Host: ${esc(alert.host)}`,
-    alert.source ? `Source: ${esc(alert.source)}` : "",
-    alert.customer ? `Customer: ${esc(alert.customer)}` : "",
-    alert.event_id ? `Event: ${esc(alert.event_id)}` : "",
-    `Event time: ${esc(alert.timestamp)}`,
-    `Dedupe key: ${esc(alert.dedupe_key)}`,
-  ].filter(Boolean);
-
-  const sections = [`${heading("Monitoring alert")}<br>${meta.join("<br>")}`];
-  if (alert.message) sections.push(`${heading("Message")}<br>${esc(truncate(alert.message)).replace(/\n/g, "<br>")}`);
-  const details = detailLines(alert.details);
-  if (details.length) sections.push(`${heading("Details")}<br>${details.join("<br>")}`);
-  return sections.join("<br><br>");
-}
-
-/** Resolved Gorelo routing for an alert (client + optional matched asset/location). */
-interface AlertRouting {
-  clientId: number;
-  locationId: number | null;
-  agentAssetIds: string[];
+  const lines = [
+    alert.message,
+    "",
+    `Monitor: ${alert.monitor_id}`,
+    alert.source ? `Source: ${alert.source}` : "",
+    alert.customer ? `Customer: ${alert.customer}` : "",
+    alert.event_id ? `Event: ${alert.event_id}` : "",
+    `Event time: ${alert.timestamp}`,
+    `Dedupe key: ${alert.dedupe_key}`,
+    ...detailLines(alert.details),
+  ].filter((l) => l !== "");
+  return truncate(lines.join("\n"));
 }
 
 /**
- * Resolve where an alert ticket lands: an explicit ALERT_CLIENT_ID, else the alert's
- * `customer` matched by exact name against the client mirror, else CATCHALL_CLIENT_ID.
- * Best-effort: if the alert's `host` matches a mirrored device, attach it as a Gorelo
- * asset and borrow its client/location when we'd otherwise fall to the catch-all.
+ * Resolve the Gorelo client an alert is raised against: an explicit ALERT_CLIENT_ID,
+ * else the alert's `customer` matched by exact name in the client mirror, else the
+ * alert's `host` matched to a mirrored device's client, else CATCHALL_CLIENT_ID.
  */
-async function resolveRouting(env: Env, alert: Alert): Promise<AlertRouting> {
-  const catchall = Number(env.CATCHALL_CLIENT_ID) || 0;
-  let clientId = 0;
-
+async function resolveClientId(env: Env, alert: Alert): Promise<number> {
   const explicit = Number(env.ALERT_CLIENT_ID);
-  if (Number.isFinite(explicit) && explicit > 0) {
-    clientId = explicit;
-  } else if (alert.customer) {
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  if (alert.customer) {
     const rows = await listClientRows(env.DB, alert.customer, 5);
     const want = alert.customer.trim().toLowerCase();
     const exact = rows.find((r) => (r.name ?? "").trim().toLowerCase() === want);
-    if (exact) clientId = exact.id;
+    if (exact) return exact.id;
   }
 
-  let locationId: number | null = null;
-  const agentAssetIds: string[] = [];
   const host = normalizeHost(alert.host);
   if (host) {
     const device = await findDeviceFullByHostname(env.DB, host);
-    if (device) {
-      if (device.agent_id) agentAssetIds.push(device.agent_id);
-      locationId = device.location_id ?? null;
-      // Only let the mirrored device override routing when we have no better client.
-      if (clientId <= 0 && device.client_id) clientId = device.client_id;
-    }
+    if (device?.client_id) return device.client_id;
   }
 
-  return { clientId: clientId > 0 ? clientId : catchall, locationId, agentAssetIds };
+  return Number(env.CATCHALL_CLIENT_ID) || 0;
 }
 
-/** Base Gorelo create command for an alert (title/description/routing/priority). */
-function buildTicketCommand(
+/** Build a Gorelo PostAlertRequest for an alert (optionally overriding name/severity/description). */
+function buildAlertRequest(
   env: Env,
+  clientId: number,
   alert: Alert,
-  routing: AlertRouting,
-  overrides: Partial<CreatePublicTicketCommand> = {},
-): CreatePublicTicketCommand {
+  overrides: Partial<PostAlertRequest> = {},
+): PostAlertRequest {
   return {
-    title: alert.title,
-    createdByName: alert.source || "Monitoring",
-    clientId: routing.clientId,
-    locationId: routing.locationId,
-    contactId: null,
+    name: alert.title,
+    clientId,
+    resource: alert.host, // the host/service the alert is raised for
+    severity: alertLevel(env, alert.severity),
     description: buildDescription(alert),
-    statusId: Number(env.DEFAULT_STATUS_ID),
-    groupId: Number(env.DEFAULT_GROUP_ID),
-    typeId: Number(env.DEFAULT_TYPE_ID),
-    priorityId: alertPriority(env, alert.severity),
-    sourceId: Number(env.DEFAULT_SOURCE) as TicketSource,
-    tagIds: alertTagIds(env),
-    agentAssetIds: routing.agentAssetIds,
-    // Monitoring alerts are machine-generated — never email a "requester".
-    sendTicketCreatedEmail: false,
     ...overrides,
   };
-}
-
-/** The Gorelo status a resolution notice lands in (reuses the Halo resolved-status var). */
-function resolvedStatusId(env: Env): number {
-  return Number(env.DEFAULT_RESOLVED_STATUS_ID) || Number(env.DEFAULT_STATUS_ID);
-}
-
-/** A created Gorelo ticket's human-facing number, read back from the create GUID. */
-type TicketNumber = { number: number | null; displayNumber: string | null } | null;
-
-/** Create a Gorelo ticket and read its human number back. Throws GoreloError on reject. */
-async function createGoreloTicket(
-  env: Env,
-  cmd: CreatePublicTicketCommand,
-): Promise<{ goreloId: string; number: TicketNumber }> {
-  const client = new GoreloClient(env);
-  const raw = await client.createTicket(cmd);
-  const goreloId = extractTicketNumber(raw) ?? "";
-  const number = await client.resolveTicketNumber(goreloId);
-  return { goreloId, number };
-}
-
-/** The best human-facing remote id to echo back (display number, number, else GUID). */
-function remoteId(row: { display_number: string | null; number: number | null; gorelo_id: string | null }): string | undefined {
-  return row.display_number ?? (row.number != null ? String(row.number) : row.gorelo_id ?? undefined);
 }
 
 // --- request handler --------------------------------------------------------
@@ -432,7 +374,6 @@ export async function handleAlert(request: Request, env: Env): Promise<Response>
       accepted: true,
       action: outcome.action,
       dedupe_key: alert.dedupe_key,
-      ...(outcome.remoteId ? { remote_id: outcome.remoteId } : {}),
     });
   } catch (err) {
     if (err instanceof GoreloError) {
@@ -446,11 +387,10 @@ export async function handleAlert(request: Request, env: Env): Promise<Response>
   }
 }
 
-/** The result of applying an alert: the action taken + any Gorelo remote id + status. */
+/** The result of applying an alert: the action taken + whether we posted to Gorelo. */
 interface Outcome {
   action: "created" | "updated" | "resolved" | "heartbeat-recorded" | "duplicate-ignored";
-  remoteId?: string;
-  goreloStatus?: number;
+  posted?: boolean; // true when this event posted an alert to Gorelo (for the audit log)
 }
 
 /** Apply the alert to our store + Gorelo per its status. May throw GoreloError. */
@@ -470,17 +410,22 @@ async function applyAlert(env: Env, alert: Alert, eventKey: string): Promise<Out
   }
 
   const existing = await getAlert(env.DB, alert.dedupe_key);
+  const client = new GoreloClient(env);
 
   if (alert.status === "resolved") {
-    // Nothing open to resolve -> idempotent success, no new ticket (spec).
+    // Nothing open to resolve -> idempotent success, no Gorelo call (spec).
     if (!existing || existing.status !== "open") return { action: "duplicate-ignored" };
 
-    // Gorelo can't close the original ticket, so file a labeled resolution notice
-    // (in the resolved status) that names it, then mark our alert resolved. Notice
-    // creation is the gate: on failure we leave the alert open so a retry re-files.
-    const routing = await resolveRouting(env, alert);
-    const cmd = buildResolutionNotice(env, alert, existing, routing);
-    const { goreloId, number } = await createGoreloTicket(env, cmd);
+    // Gorelo alerts are create-only (no close), so post a "Resolved: …" alert to
+    // signal the clear, then mark our row resolved. The post is the gate: on failure
+    // we leave the alert open so a retry re-posts.
+    const clientId = await resolveClientId(env, alert);
+    await client.postAlert(
+      buildAlertRequest(env, clientId, alert, {
+        name: `Resolved: ${existing.title || alert.title}`,
+        description: `Resolved.\n\n${buildDescription(alert)}`,
+      }),
+    );
     await putAlert(env.DB, {
       ...existing,
       severity: alert.severity,
@@ -490,17 +435,16 @@ async function applyAlert(env: Env, alert: Alert, eventKey: string): Promise<Out
       updated_at: now,
       resolved_at: now,
     });
-    const rid = remoteId({ display_number: number?.displayNumber ?? null, number: number?.number ?? null, gorelo_id: goreloId });
-    return { action: "resolved", remoteId: rid ?? remoteId(existing), goreloStatus: 200 };
+    return { action: "resolved", posted: true };
   }
 
   // status === "triggered"
   const open = existing && existing.status === "open" ? existing : null;
   if (open) {
     // Exact same event replayed -> ignore (idempotency). Otherwise fold the newer
-    // message/severity into the open alert WITHOUT opening a second Gorelo ticket.
+    // message/severity into the open alert WITHOUT re-posting to Gorelo.
     if (eventKey && open.last_event_id === eventKey) {
-      return { action: "duplicate-ignored", remoteId: remoteId(open) };
+      return { action: "duplicate-ignored" };
     }
     await putAlert(env.DB, {
       ...open,
@@ -510,13 +454,12 @@ async function applyAlert(env: Env, alert: Alert, eventKey: string): Promise<Out
       last_event_id: eventKey || open.last_event_id,
       updated_at: now,
     });
-    return { action: "updated", remoteId: remoteId(open) };
+    return { action: "updated" };
   }
 
-  // No open alert (new, or re-triggered after a resolve) -> create a fresh ticket.
-  const routing = await resolveRouting(env, alert);
-  const cmd = buildTicketCommand(env, alert, routing);
-  const { goreloId, number } = await createGoreloTicket(env, cmd);
+  // No open alert (new, or re-triggered after a resolve) -> post a fresh Gorelo alert.
+  const clientId = await resolveClientId(env, alert);
+  await client.postAlert(buildAlertRequest(env, clientId, alert));
   await putAlert(env.DB, {
     dedupe_key: alert.dedupe_key,
     monitor_id: alert.monitor_id,
@@ -527,48 +470,26 @@ async function applyAlert(env: Env, alert: Alert, eventKey: string): Promise<Out
     status: "open",
     title: alert.title,
     message: alert.message,
-    gorelo_id: goreloId || null,
-    number: number?.number ?? null,
-    display_number: number?.displayNumber ?? null,
+    gorelo_id: null,
+    number: null,
+    display_number: null,
     last_event_id: eventKey || null,
     created_at: now,
     updated_at: now,
     resolved_at: null,
   });
-  const rid = remoteId({ display_number: number?.displayNumber ?? null, number: number?.number ?? null, gorelo_id: goreloId });
-  return { action: "created", remoteId: rid, goreloStatus: 200 };
-}
-
-/** Rewrite the alert into a resolution-notice create command naming the original. */
-function buildResolutionNotice(
-  env: Env,
-  alert: Alert,
-  original: AlertRow,
-  routing: AlertRouting,
-): CreatePublicTicketCommand {
-  const ref = original.display_number || (original.number != null ? String(original.number) : original.gorelo_id || alert.dedupe_key);
-  const banner =
-    `${heading("Monitoring alert resolved")}<br>` +
-    `The monitoring source reported this alert resolved. Gorelo has no ticket-update ` +
-    `API, so the original ticket must be closed manually.<br>` +
-    `Original ticket: ${esc(ref)}${original.title ? ` — ${esc(original.title)}` : ""}`;
-  return buildTicketCommand(env, alert, routing, {
-    title: original.title ? `Resolved: ${original.title}` : `Resolved: ${alert.title}`,
-    description: `${banner}<br><br>${buildDescription(alert)}`,
-    statusId: resolvedStatusId(env),
-  });
+  return { action: "created", posted: true };
 }
 
 /**
  * Operational log line for an alert (audit trail). Logs the fields the spec asks for —
- * event time, source IP, host, monitor_id, dedupe_key, status, severity, Gorelo
- * response status, Gorelo remote id — and NEVER the shared secret.
+ * event time, source IP, host, monitor_id, dedupe_key, status, severity, action, and
+ * whether we posted to Gorelo — and NEVER the shared secret.
  */
 function logAlert(alert: Alert, ip: string, sourceKey: string, outcome: Outcome): void {
   breadcrumb(
     `ALERT ts=${alert.timestamp} ip=${ip || "?"} source=${sourceKey} host=${alert.host} ` +
       `monitor=${alert.monitor_id} dedupe=${alert.dedupe_key} status=${alert.status} ` +
-      `severity=${alert.severity} action=${outcome.action} ` +
-      `gorelo_status=${outcome.goreloStatus ?? "-"} remote=${outcome.remoteId ?? "-"}`,
+      `severity=${alert.severity} action=${outcome.action} gorelo=${outcome.posted ? "posted" : "-"}`,
   );
 }

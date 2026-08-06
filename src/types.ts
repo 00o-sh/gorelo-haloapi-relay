@@ -74,16 +74,16 @@ export interface Env {
   // permitted to POST alerts (matched via CF-Connecting-IP). Enforced only when
   // ENFORCE_IP_ALLOWLIST is on; empty while enforced => the source is rejected.
   ALERT_ALLOWED_IPS?: string;
-  // Optional Gorelo client id alert tickets are filed under. Unset => resolve the
-  // alert's `customer` against the client mirror by exact name, else CATCHALL_CLIENT_ID.
+  // Optional Gorelo client id alerts are raised against (PostAlertRequest.ClientId).
+  // Unset => resolve the alert's `customer` against the client mirror by exact name,
+  // then the alert's `host` against a mirrored device, else CATCHALL_CLIENT_ID.
   ALERT_CLIENT_ID?: string; // int as string
-  // Optional Gorelo tag id applied to alert tickets. Unset => FALLBACK_TAG_ID.
-  ALERT_TAG_ID?: string; // int as string
-  // Optional per-severity Gorelo priority overrides. Unset => derived defaults
-  // (critical -> EMERGENCY_PRIORITY|1, warning -> DEFAULT_PRIORITY|2, info -> 4).
-  ALERT_PRIORITY_CRITICAL?: string; // PublicTicketPriority int as string
-  ALERT_PRIORITY_WARNING?: string; // int as string
-  ALERT_PRIORITY_INFO?: string; // int as string
+  // Optional per-severity Gorelo AlertLevel overrides (the int Severity on
+  // PostAlertRequest). Unset => info->1, warning->2, critical->3. AlertLevel is an
+  // unlabeled 1–4 enum in the spec — TODO(verify) which int is which in the Gorelo UI.
+  ALERT_LEVEL_CRITICAL?: string; // AlertLevel int (1–4) as string
+  ALERT_LEVEL_WARNING?: string; // AlertLevel int as string
+  ALERT_LEVEL_INFO?: string; // AlertLevel int as string
 
   // secrets (wrangler secret put ...)
   GORELO_API_KEY: string; // X-API-Key sent to Gorelo
@@ -131,6 +131,27 @@ export type PublicTicketPriority = 0 | 1 | 2 | 3 | 4;
  * TODO(verify): confirm which int is the "integration/portal/API" source in the Gorelo UI.
  */
 export type TicketSource = 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * AlertLevel — Gorelo's alert severity enum. Ships integers [1,2,3,4] WITHOUT labels.
+ * TODO(verify): confirm which int is info/warning/critical in the Gorelo UI.
+ */
+export type AlertLevel = 1 | 2 | 3 | 4;
+
+/**
+ * Body for Gorelo's native alert endpoint, POST /v1/alerts/ ("Posts an external alert
+ * against a client"). Modeled camelCase; GoreloClient pascalizes it on the way out
+ * (Name/ClientId/Resource/Severity/Description). Required: name, clientId, resource.
+ * The response is a boolean success envelope — there is NO alert id, and no
+ * update/close/GET, so alert dedup + the open→resolved lifecycle are owned by the relay.
+ */
+export interface PostAlertRequest {
+  name: string; // alert title
+  clientId: number; // the client the alert relates to
+  resource: string; // host/service the alert is raised for (e.g. "SPH-RVR-SQL01")
+  severity?: AlertLevel;
+  description?: string; // free-text detail
+}
 
 /** Body for POST /v1/tickets. No email field — requires numeric clientId/contactId. */
 export interface CreatePublicTicketCommand {

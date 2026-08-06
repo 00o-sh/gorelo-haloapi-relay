@@ -99,14 +99,15 @@ export async function initSchema(db: D1Database): Promise<void> {
         created_at     TEXT NOT NULL
       )`,
     ),
-    // Monitoring alerts (POST /v1/alerts). One row per `dedupe_key` — the stable
-    // identity a monitoring source (e.g. an on-prem SQL server) reuses across
-    // retries. `status` is our own lifecycle ('open' | 'resolved'), distinct from
-    // the Gorelo ticket status; `last_event_id` is the last processed
-    // Idempotency-Key / event_id so a re-POST of the SAME event is ignored rather
-    // than treated as an update. Gorelo has no ticket-update/close API, so dedup
-    // and the open→resolved transition are tracked here (the Gorelo ticket is
-    // created once; resolution files a labeled notice — see src/alerts.ts).
+    // Monitoring alerts (POST /v1/alerts -> Gorelo's native POST /v1/alerts/). One row
+    // per `dedupe_key` — the stable identity a monitoring source (e.g. an on-prem SQL
+    // server) reuses across retries. `status` is our own lifecycle ('open' |
+    // 'resolved'); `last_event_id` is the last processed Idempotency-Key / event_id so a
+    // re-POST of the SAME event is ignored rather than treated as an update. Gorelo's
+    // alert API is create-only (no id/close), so dedup and the open→resolved transition
+    // are tracked here — the alert is posted once; resolution posts a "Resolved: …"
+    // alert (see src/alerts.ts). The gorelo_id/number/display_number columns are legacy
+    // (unused for native alerts, which return no id) and left null.
     db.prepare(
       `CREATE TABLE IF NOT EXISTS alerts (
         dedupe_key     TEXT PRIMARY KEY,
