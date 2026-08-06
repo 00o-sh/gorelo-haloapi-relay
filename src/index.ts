@@ -1,6 +1,13 @@
 import { getLastSync, getSyncMeta, initSchema, mirrorCounts, setSyncMeta } from "./db.js";
 import { GoreloClient } from "./gorelo.js";
-import { flushPendingTickets, handleHalo, isHaloRequest, postSyncFailure, testNotifly } from "./halo.js";
+import {
+  flushPendingJira,
+  flushPendingTickets,
+  handleHalo,
+  isHaloRequest,
+  postSyncFailure,
+  testNotifly,
+} from "./halo.js";
 import { breadcrumb, describeError } from "./log.js";
 import { reconcileClientLocations, syncAll } from "./sync.js";
 import type { Env, SyncLocationsMessage } from "./types.js";
@@ -146,6 +153,16 @@ export default {
           if (n > 0) breadcrumb(`cron flush created ${n} orphaned ticket(s)`);
         })
         .catch((err) => breadcrumb(`cron flush failed ${describeError(err)}`)),
+    );
+    // Same frequent cron also drains the Jira fan-out retry queue (co-managed
+    // clients) — an independent task so a Jira issue never blocks the ticket flush.
+    ctx.waitUntil(
+      initSchema(env.DB)
+        .then(() => flushPendingJira(env))
+        .then((n) => {
+          if (n > 0) breadcrumb(`cron flush processed ${n} pending Jira job(s)`);
+        })
+        .catch((err) => breadcrumb(`cron Jira flush failed ${describeError(err)}`)),
     );
   },
 

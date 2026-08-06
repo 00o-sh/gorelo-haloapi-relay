@@ -148,7 +148,7 @@ export function firstNotificationCode(body: string): string | null {
  * `/\/+$/` backtracks quadratically on inputs with long runs of slashes, so
  * we walk back from the end by hand instead — O(n) regardless of the input.
  */
-function stripTrailingSlashes(s: string): string {
+export function stripTrailingSlashes(s: string): string {
   let end = s.length;
   while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) end--;
   return s.slice(0, end);

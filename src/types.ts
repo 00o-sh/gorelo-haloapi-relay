@@ -56,6 +56,11 @@ export interface Env {
   // catch-all/no-contact fallback. Any other value (or unset) suppresses it.
   SEND_TICKET_CREATED_EMAIL?: string;
   DEBUG_LOGS?: string; // "true" enables verbose HALO CAPTURE/RESPONSE body logging (PII)
+  // Jira output for co-managed clients (see src/jira.ts). Master switch: "true"
+  // (also "1"/"yes"/"on") turns on the Huntress→Jira fan-out; unset/anything else
+  // leaves it off. Enrollment is still per-client via JIRA_TARGETS, so a client
+  // with no target entry is never sent to Jira even when this is on.
+  ENABLE_JIRA?: string; // "true" | "false" (default false)
 
   // secrets (wrangler secret put ...)
   GORELO_API_KEY: string; // X-API-Key sent to Gorelo
@@ -63,6 +68,15 @@ export interface Env {
   // Optional notifly (Apprise-style) URLs alerted when a ticket is dead-lettered.
   // Comma/space/newline separated, e.g. "ntfy://alerts, msteams://…, slack://…".
   NOTIFLY_URLS?: string;
+  // Per-client Jira Cloud destinations for the Huntress→Jira fan-out (co-managed
+  // clients). A JSON array (kept in a Worker secret — it holds API tokens), one
+  // entry per enrolled Gorelo client; a client is sent to Jira exactly when it has
+  // an entry here (and ENABLE_JIRA is on). Shape (see JiraTarget in src/jira.ts):
+  //   [{ "clientId": 15567, "baseUrl": "https://acme.atlassian.net",
+  //      "projectKey": "SEC", "issueType": "Task", "email": "svc@acme.com",
+  //      "apiToken": "…", "resolvedTransition": "Done" }]
+  // Set via `wrangler secret put JIRA_TARGETS`; never commit it to wrangler.toml.
+  JIRA_TARGETS?: string;
 
   // Per-product Halo mock OAuth credentials (issue #51). Each product authenticates
   // with its OWN client_id, so credentials are resolved per matched product via the

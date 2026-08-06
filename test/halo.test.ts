@@ -1,7 +1,7 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import worker from "../src/index.js";
-import { flushPendingTickets, haloResource, isHaloPath, isHaloRequest } from "../src/halo.js";
+import { flushPendingJira, flushPendingTickets, haloResource, isHaloPath, isHaloRequest } from "../src/halo.js";
 import { initSchema } from "../src/db.js";
 import { assetNum } from "../src/sync.js";
 import { signToken } from "../src/token.js";
@@ -1509,5 +1509,252 @@ describe("Halo eager create — matched Tier2 product", () => {
     const act = await req("/actions", tier2Init([{ ticket_id: id, note_html: "note" }]));
     expect(act.status).toBe(201);
     expect(creates).toBe(1); // eager create only — the note did NOT create a second ticket
+  });
+});
+
+// Huntress → Jira fan-out for co-managed clients: a Huntress alert for an enrolled
+// client is mirrored into that client's Jira (in addition to the Gorelo ticket), and
+// the Jira issue is closed when Huntress later resolves the incident. Best-effort —
+// a Jira failure never affects the Gorelo create; it queues a retry the cron drains.
+describe("Huntress → Jira fan-out (co-managed clients)", () => {
+  const JIRA_HOST = "acme.atlassian.net";
+  // Enrolls Gorelo client 10 (seeded "Corp") to a scratch Jira project.
+  const JIRA_TARGETS_10 = JSON.stringify([
+    {
+      clientId: 10,
+      baseUrl: "https://acme.atlassian.net",
+      projectKey: "SEC",
+      issueType: "Task",
+      email: "svc@acme.com",
+      apiToken: "jira-token",
+      resolvedTransition: "Done",
+    },
+  ]);
+
+  const huntressInit = (bodyObj: unknown): RequestInit => ({
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "user-agent": "Huntress Halo Integration",
+      "CF-Connecting-IP": "52.4.130.244",
+    },
+    body: JSON.stringify(bodyObj),
+  });
+  async function withJiraHuntress(fn: () => Promise<void>, targets: string = JIRA_TARGETS_10): Promise<void> {
+    const e = env as { ENABLE_HUNTRESS?: string; ENABLE_JIRA?: string; JIRA_TARGETS?: string };
+    const prev = { h: e.ENABLE_HUNTRESS, j: e.ENABLE_JIRA, t: e.JIRA_TARGETS };
+    e.ENABLE_HUNTRESS = "true";
+    e.ENABLE_JIRA = "true";
+    e.JIRA_TARGETS = targets;
+    // These two tables persist across specs in the shared isolate — clear them.
+    await env.DB.prepare(`DELETE FROM created_tickets`).run();
+    await env.DB.prepare(`DELETE FROM pending_jira`).run();
+    try {
+      await fn();
+    } finally {
+      e.ENABLE_HUNTRESS = prev.h;
+      e.ENABLE_JIRA = prev.j;
+      e.JIRA_TARGETS = prev.t;
+    }
+  }
+
+  // Mock POST /rest/api/3/issue; `status` is mutable so a test can flip 500 -> 201.
+  function captureJiraCreate(opts: { key?: string; status?: number } = {}): {
+    posted: () => Record<string, unknown> | undefined;
+    calls: number;
+    status: number;
+  } {
+    const state = {
+      key: opts.key ?? "SEC-1",
+      status: opts.status ?? 201,
+      calls: 0,
+      _posted: undefined as Record<string, unknown> | undefined,
+      posted(): Record<string, unknown> | undefined {
+        return this._posted;
+      },
+    };
+    routes.push({
+      method: "POST",
+      match: (u) => u.hostname === JIRA_HOST && u.pathname === "/rest/api/3/issue",
+      handler: async (r) => {
+        state.calls++;
+        state._posted = (await r.json()) as Record<string, unknown>;
+        if (state.status >= 400) return json(state.status, { errorMessages: ["boom"] });
+        return json(state.status, { id: "10000", key: state.key });
+      },
+    });
+    return state;
+  }
+
+  // Mock the resolution-close calls: comment (POST), transitions (GET + POST).
+  function captureJiraClose(transitionName = "Done"): {
+    comment: () => unknown;
+    transition: () => Record<string, unknown> | undefined;
+  } {
+    const state = {
+      _comment: undefined as unknown,
+      _transition: undefined as Record<string, unknown> | undefined,
+      comment(): unknown {
+        return this._comment;
+      },
+      transition(): Record<string, unknown> | undefined {
+        return this._transition;
+      },
+    };
+    routes.push({
+      method: "POST",
+      match: (u) => u.hostname === JIRA_HOST && /\/comment$/.test(u.pathname),
+      handler: async (r) => {
+        state._comment = await r.json();
+        return json(201, { id: "1" });
+      },
+    });
+    routes.push({
+      method: "GET",
+      match: (u) => u.hostname === JIRA_HOST && /\/transitions$/.test(u.pathname),
+      handler: () => json(200, { transitions: [{ id: "31", name: transitionName }] }),
+    });
+    routes.push({
+      method: "POST",
+      match: (u) => u.hostname === JIRA_HOST && /\/transitions$/.test(u.pathname),
+      handler: async (r) => {
+        state._transition = (await r.json()) as Record<string, unknown>;
+        return new Response(null, { status: 204 });
+      },
+    });
+    return state;
+  }
+
+  it("mirrors an enrolled Huntress alert into Jira and stores the issue key on the ledger", async () => {
+    await withJiraHuntress(async () => {
+      captureGoreloCreate({ number: 700111, displayNumber: "T-700111" });
+      const jira = captureJiraCreate({ key: "SEC-1" });
+      const res = await req(
+        "/api/Tickets",
+        huntressInit([{ summary: "Suspicious login", details: "anomalous login", client_id: "10" }]),
+      );
+      expect(res.status).toBe(201);
+      const id = ((await res.json()) as { id: number }).id;
+      expect(id).toBe(700111);
+      // The Jira issue was created under the enrolled project with the right shape.
+      expect(jira.calls).toBe(1);
+      const fields = jira.posted()!.fields as Record<string, unknown>;
+      expect((fields.project as { key: string }).key).toBe("SEC");
+      expect(fields.summary).toBe("Suspicious login");
+      expect(fields.labels).toEqual(expect.arrayContaining(["huntress", "gorelo-700111"]));
+      const adf = JSON.stringify(fields.description);
+      expect(adf).toContain("T-700111"); // cross-reference to the Gorelo ticket
+      expect(adf).toContain("anomalous login"); // the alert body
+      // The issue key is recorded on the ledger; nothing left queued.
+      const row = await env.DB.prepare(`SELECT jira_issue_key FROM created_tickets WHERE halo_id = ?`)
+        .bind(700111)
+        .first<{ jira_issue_key: string | null }>();
+      expect(row?.jira_issue_key).toBe("SEC-1");
+      const pj = await env.DB.prepare(`SELECT COUNT(*) AS n FROM pending_jira`).first<{ n: number }>();
+      expect(pj?.n).toBe(0);
+    });
+  });
+
+  it("does not fan out to Jira for a client with no target entry", async () => {
+    // Enroll a DIFFERENT client; the alert's client 10 is therefore unenrolled. No
+    // Jira route is registered, so any fan-out attempt would throw "unmocked fetch".
+    const otherTarget = JSON.stringify([
+      { clientId: 12345, baseUrl: "https://other.atlassian.net", projectKey: "X", email: "e@x.com", apiToken: "t" },
+    ]);
+    await withJiraHuntress(async () => {
+      captureGoreloCreate({ number: 700222, displayNumber: "T-700222" });
+      const res = await req("/api/Tickets", huntressInit([{ summary: "x", details: "y", client_id: "10" }]));
+      expect(res.status).toBe(201);
+      const row = await env.DB.prepare(`SELECT jira_issue_key FROM created_tickets WHERE halo_id = ?`)
+        .bind(700222)
+        .first<{ jira_issue_key: string | null }>();
+      expect(row?.jira_issue_key ?? null).toBeNull();
+      const pj = await env.DB.prepare(`SELECT COUNT(*) AS n FROM pending_jira`).first<{ n: number }>();
+      expect(pj?.n).toBe(0);
+    }, otherTarget);
+  });
+
+  it("does not fan out when ENABLE_JIRA is off, even for an enrolled client", async () => {
+    await withJiraHuntress(async () => {
+      (env as { ENABLE_JIRA?: string }).ENABLE_JIRA = "false";
+      captureGoreloCreate({ number: 700444, displayNumber: "T-700444" });
+      const res = await req("/api/Tickets", huntressInit([{ summary: "x", details: "y", client_id: "10" }]));
+      expect(res.status).toBe(201); // no Jira route needed — a fan-out would throw
+      const pj = await env.DB.prepare(`SELECT COUNT(*) AS n FROM pending_jira`).first<{ n: number }>();
+      expect(pj?.n).toBe(0);
+    });
+  });
+
+  it("closes the linked Jira issue when Huntress resolves the incident", async () => {
+    await withJiraHuntress(async () => {
+      captureGoreloCreate({ number: 700900, displayNumber: "T-700900" });
+      captureJiraCreate({ key: "SEC-9" });
+      const created = await req(
+        "/api/Tickets",
+        huntressInit([{ summary: "Suspicious login", details: "anomalous", client_id: "10" }]),
+      );
+      expect(((await created.json()) as { id: number }).id).toBe(700900);
+      const row = await env.DB.prepare(`SELECT jira_issue_key FROM created_tickets WHERE halo_id = ?`)
+        .bind(700900)
+        .first<{ jira_issue_key: string }>();
+      expect(row?.jira_issue_key).toBe("SEC-9");
+
+      // Huntress resolves by editing the original ticket to a resolved status.
+      const close = captureJiraClose("Done");
+      const resolved = await req("/api/Tickets", huntressInit([{ id: 700900, status_id: 3 }]));
+      expect(resolved.status).toBe(200); // the resolution echo
+      // The linked Jira issue got a resolution comment and a transition to "Done".
+      expect(close.comment()).toBeDefined();
+      expect((close.transition()?.transition as { id: string } | undefined)?.id).toBe("31");
+      const pj = await env.DB.prepare(`SELECT COUNT(*) AS n FROM pending_jira`).first<{ n: number }>();
+      expect(pj?.n).toBe(0);
+    });
+  });
+
+  it("queues a durable retry when the Jira create fails, then the cron flush creates it", async () => {
+    await withJiraHuntress(async () => {
+      captureGoreloCreate({ number: 700333, displayNumber: "T-700333" });
+      const jira = captureJiraCreate({ key: "SEC-77", status: 500 }); // fail first
+      const res = await req("/api/Tickets", huntressInit([{ summary: "retry me", details: "z", client_id: "10" }]));
+      // The Gorelo ticket still succeeds and the caller still gets 201.
+      expect(res.status).toBe(201);
+      let row = await env.DB.prepare(`SELECT jira_issue_key FROM created_tickets WHERE halo_id = ?`)
+        .bind(700333)
+        .first<{ jira_issue_key: string | null }>();
+      expect(row?.jira_issue_key ?? null).toBeNull();
+      const queued = await env.DB.prepare(`SELECT kind FROM pending_jira`).all<{ kind: string }>();
+      expect(queued.results?.length).toBe(1);
+      expect(queued.results![0]!.kind).toBe("create");
+
+      // Recover Jira, age the job past the grace window, and drain it.
+      jira.status = 201;
+      await env.DB.prepare(`UPDATE pending_jira SET created_at = '2000-01-01T00:00:00Z'`).run();
+      const done = await flushPendingJira(env);
+      expect(done).toBe(1);
+      row = await env.DB.prepare(`SELECT jira_issue_key FROM created_tickets WHERE halo_id = ?`)
+        .bind(700333)
+        .first<{ jira_issue_key: string | null }>();
+      expect(row?.jira_issue_key).toBe("SEC-77");
+      const pj = await env.DB.prepare(`SELECT COUNT(*) AS n FROM pending_jira`).first<{ n: number }>();
+      expect(pj?.n).toBe(0);
+    });
+  });
+
+  it("dead-letters a Jira job after the max attempts instead of retrying forever", async () => {
+    await withJiraHuntress(async () => {
+      captureJiraCreate({ status: 500 }); // always fails
+      // Seed a job already at the final attempt, aged past the grace window.
+      await env.DB.prepare(
+        `INSERT INTO pending_jira (kind, client_id, halo_id, payload, created_at, attempts)
+         VALUES ('create', 10, NULL, ?, '2000-01-01T00:00:00Z', 4)`,
+      )
+        .bind(JSON.stringify({ summary: "x", description: "y", labels: ["huntress"] }))
+        .run();
+      const done = await flushPendingJira(env);
+      expect(done).toBe(0); // the attempt failed
+      // Not re-queued — it hit the attempt ceiling and was dropped (dead-lettered).
+      const pj = await env.DB.prepare(`SELECT COUNT(*) AS n FROM pending_jira`).first<{ n: number }>();
+      expect(pj?.n).toBe(0);
+    });
   });
 });
