@@ -22,7 +22,12 @@
       "onAutoForward": "notify"
     }
   },
-  "postCreateCommand": "npm ci",
+  // npm v12 blocks dependency install scripts by default, which skips `workerd`
+  // (wrangler dev's runtime) and `esbuild` (the bundler) — so `npm run dev` / `npm test`
+  // would fail. package.json `allowScripts` already permits them, but that field is
+  // version-pinned; this name-based flag keeps the container working even right after a
+  // Renovate bump changes those versions. On npm <12 the flag is a harmless no-op.
+  "postCreateCommand": "npm ci --allow-scripts=workerd,esbuild",
   "customizations": {
     "vscode": {
       // Make VS Code's own port forwarding bind to all interfaces (LAN-reachable)
