@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Fail early if a Renovate bump changed a workerd/esbuild version without
+      # refreshing package.json `allowScripts` — npm v12 would then block those
+      # install scripts and break the dev container. See scripts/check-allowscripts.mjs.
+      - name: Verify allowScripts allowlist
+        run: npm run check:allowscripts
+
       - name: Typecheck
         run: npm run typecheck
 

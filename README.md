@@ -113,7 +113,92 @@ curl -X POST https://<your-worker-host>/admin/sync -H "X-Admin-Key: <ADMIN_KEY>"
 ```
 
 For local development, copy `.dev.vars.example` to `.dev.vars` (git-ignored) and
-run `wrangler dev`.
+run `wrangler dev`. See the workflow below.
+
+## Local development
+
+Develop and test **without deploying to prod**. `wrangler dev` runs the Worker on
+Miniflare with a **local D1** (a SQLite file under `.wrangler/state`, keyed by the D1
+binding — the `database_id` in `wrangler.toml` is only used for `--remote`/`deploy`, so
+local state is fully isolated from prod) and local queues/crons. The vitest suite
+(`npm test`) likewise runs against an isolated in-memory D1 — neither touches prod.
+
+Outbound calls to **Gorelo are real**: point `GORELO_BASE_URL` / `GORELO_API_KEY` in
+`.dev.vars` at whatever tenant you want to exercise. That means a `triggered`/ticket-
+creating request against the local Worker files a **real** Gorelo ticket — use an
+obvious `TEST —` title, or exercise no-write paths (e.g. an alert `heartbeat`, or the
+health endpoints) when you don't want side effects.
+
+### Dev container
+
+`.devcontainer/` pins Node to match CI and installs deps on create — open the repo in a
+[dev container](https://containers.dev) (VS Code "Reopen in Container", GitHub Codespaces,
+or Claude Code on the web) and you get a ready toolchain with port `8787` published.
+
+### Reaching the local Worker from other devices on the network
+
+To let another device on your LAN (e.g. a test SQL/monitoring host) hit the local
+Worker, two things must line up:
+
+1. **wrangler must listen on all interfaces** inside the container, not just
+   `localhost`: use `npm run dev:lan` (`wrangler dev --ip 0.0.0.0`).
+2. **the port must be published to the host on `0.0.0.0`.** The dev container does this
+   via `appPort` (a real Docker `-p 8787:8787` publish) plus VS Code's
+   `remote.localPortHost: allInterfaces`. Outside the container, `wrangler dev --ip
+   0.0.0.0` already binds the host directly.
+
+Then other devices reach it at **`http://<host-LAN-IP>:8787`** (find `<host-LAN-IP>` with
+`ipconfig` / `ip addr`). Also allow inbound `8787` through the host firewall.
+
+- **Codespaces / cloud dev containers** have no LAN — instead set the forwarded port's
+  visibility to **public** and share the generated `*.app.github.dev` URL.
+- **IP allowlist caveat:** the Halo/alerts IP allowlist keys off Cloudflare's
+  `CF-Connecting-IP` header, which is **not present** in local `wrangler dev`. For LAN
+  testing either set `ENFORCE_IP_ALLOWLIST="false"` in `.dev.vars` (rely on the shared
+  secret / bearer token instead), or have the client send a `CF-Connecting-IP` header
+  matching the allowlist.
+- **Security:** this exposes a local Worker holding **real Gorelo creds** to your LAN —
+  keep it to trusted networks, and remember ticket-creating requests file real tickets.
+
+### First run
+
+```bash
+cp .dev.vars.example .dev.vars     # then fill in a real GORELO_API_KEY (+ ADMIN_KEY, etc.)
+npm ci                             # (skipped if the dev container already ran it)
+npm run dev:setup                  # apply migrations + seed synthetic data into local D1
+npm run dev                        # wrangler dev -> http://localhost:8787
+```
+
+`dev:setup` runs `db:migrate:local` then `db:seed:local`. The seed
+(`scripts/seed-dev.sql`) is **synthetic** — never seed real mirror data (names/emails/
+hosts are PHI) into a dev DB. It also stamps `last_sync` so the Worker won't lazily pull
+the real Gorelo mirror into your local D1. If you *do* want a real mirror locally, run
+`curl -X POST localhost:8787/admin/sync -H "X-Admin-Key: <ADMIN_KEY>"` (pulls real Gorelo
+data — PHI — into the local DB).
+
+### Smoke test
+
+```bash
+curl -i localhost:8787/health         # 200 ok
+```
+
+Local DB helpers: `npm run db:migrate:local`, `npm run db:seed:local`, and
+`npm run db:reset:local` (wipes the local D1 and re-seeds).
+
+### npm v12 install scripts (`allowScripts`)
+
+npm v12 blocks dependency install scripts by default. `workerd` (wrangler dev's
+runtime) and `esbuild` (the bundler) need theirs, so they're allowlisted in
+`package.json` → `allowScripts`. That field is keyed by exact `name@version`, so a
+Renovate bump to either would invalidate it — two things keep it honest:
+
+- **CI guard** (`npm run check:allowscripts`) fails the build if `allowScripts` drifts
+  from the locked versions, printing the one-line fix.
+- **Renovate** re-runs `npm approve-scripts` after updates (`postUpgradeTasks` in
+  `renovate.json`) to refresh the field automatically. This requires post-upgrade
+  commands to be **enabled/allowlisted in your Renovate (Mend) settings** (allow
+  `npm approve-scripts`); until then the CI guard is the backstop and the manual fix is
+  `npm approve-scripts workerd esbuild` (commit `package.json`).
 
 ## Helpdesk Buttons portal setup
 
@@ -687,21 +772,38 @@ snapshot is kept fresh. Both upstream specs — Gorelo **and** the HaloPSA spec
 [drift workflow](.github/workflows/swagger-drift.yml) opens a PR for either when its
 live spec changes.
 
-- **`POST /v1/tickets` response** — `{ "id": "<uuid>" }` (the ticket's GUID, not a
-  human number). `extractTicketNumber` reads `id`.
-- **`GET /v1/tickets`** — paged list (`cursor` / `pageSize` / `sortBy` / `sortOrder`),
-  returning `{ data: PublicTicketListItemModel[], nextCursor, hasMore, ... }`. Each item
-  carries the human-readable `number` / `displayNumber`, so the real ticket number can be
-  read back after a create by matching the created `id`.
-- **`agentAssetIds`** — array of agent UUIDs (`PublicDeviceResponse.id`). Only RMM
+- **Standard response envelope (2026-08 breaking change).** Every response is now
+  wrapped in `{ StatusCode, IsSuccess, Data, DataContext, Notifications }` with
+  **PascalCase** fields; the payload lives in `Data`. Cursor-paging metadata moved
+  from the top level into `DataContext.Pagination` (`NextCursor` / `PreviousCursor` /
+  `HasMore` / `HasPrevious` / `TotalCount`), and **cursors are signed** (a cursor held
+  across the release is rejected once — restart from the first page). Every failure
+  carries a **6-digit `Code`** (MMTTNN) in `Notifications[]` — branch/alert on that,
+  not on message text. The relay handles all of this at one seam in `src/gorelo.ts`:
+  it camelizes responses and unwraps the envelope on the way in, pascalizes the create
+  body on the way out, and surfaces the code via `GoreloError.code`. The rest of the
+  codebase keeps its camelCase model (`src/types.ts`).
+- **`POST /v1/tickets` response** — `Data` is `{ "Id": "<uuid>" }` (the ticket's GUID,
+  not a human number). After the client peels the envelope, `extractTicketNumber` reads
+  `id`. Request fields must be PascalCase and **unknown/misspelled fields are rejected
+  with a 400** — the relay only ever sends the documented `CreatePublicTicketCommand`
+  fields.
+- **`GET /v1/tickets`** — cursor-paged list. `pageSize` outside **1–200** is now a
+  400 (was silently clamped), and `sortBy` (`updatedOn` | `createdOn`) / `sortOrder`
+  (`asc` | `desc`) outside those documented values are rejected (was a silent fallback
+  to `updatedOn` / `desc`). `Data` items carry the human-readable `Number` /
+  `DisplayNumber`, so the real ticket number is read back after a create by matching
+  the created `id`.
+- **`agentAssetIds`** — array of agent UUIDs (`PublicDeviceResponse.Id`). Only RMM
   **agent** assets are linkable; `/v1/assets/agents` is the only asset read endpoint,
   so custom/manual assets can't be discovered or mapped.
 - **`tagIds`** — array of int64 tag ids (used for the "Submitted VIA HDB" tag).
-- **`GET /v1/assets/agents`** — a bare array, no pagination; one call fetches the
-  whole fleet.
-- **`statusId` is required** despite being marked `nullable` in the swagger — a
-  create without it returns HTTP 400, so `DEFAULT_STATUS_ID` (default `1` = New) is
-  always sent. `contactId` is optional and left null when no client contact matches.
+- **`GET /v1/assets/agents`** — cursor-paged (since 2026-07); `getAllPages` follows
+  `DataContext.Pagination.NextCursor` to fetch the whole fleet.
+- **`statusId` is required** (now **also** enforced at the schema level for
+  `POST /ticket/public`) — a create without it returns HTTP 400, so `DEFAULT_STATUS_ID`
+  (default `1` = New) is always sent. `contactId` is optional and left null when no
+  client contact matches.
 - **`DEFAULT_RESOLVED_STATUS_ID`** (optional) — the status a Huntress **resolution
   notice** lands in (see "Huntress resolutions" above); set it to your Gorelo
   "Resolved"/"Closed" status id (`GET /v1/tickets/statuses`). Unset → falls back to
