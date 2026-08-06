@@ -687,21 +687,38 @@ snapshot is kept fresh. Both upstream specs — Gorelo **and** the HaloPSA spec
 [drift workflow](.github/workflows/swagger-drift.yml) opens a PR for either when its
 live spec changes.
 
-- **`POST /v1/tickets` response** — `{ "id": "<uuid>" }` (the ticket's GUID, not a
-  human number). `extractTicketNumber` reads `id`.
-- **`GET /v1/tickets`** — paged list (`cursor` / `pageSize` / `sortBy` / `sortOrder`),
-  returning `{ data: PublicTicketListItemModel[], nextCursor, hasMore, ... }`. Each item
-  carries the human-readable `number` / `displayNumber`, so the real ticket number can be
-  read back after a create by matching the created `id`.
-- **`agentAssetIds`** — array of agent UUIDs (`PublicDeviceResponse.id`). Only RMM
+- **Standard response envelope (2026-08 breaking change).** Every response is now
+  wrapped in `{ StatusCode, IsSuccess, Data, DataContext, Notifications }` with
+  **PascalCase** fields; the payload lives in `Data`. Cursor-paging metadata moved
+  from the top level into `DataContext.Pagination` (`NextCursor` / `PreviousCursor` /
+  `HasMore` / `HasPrevious` / `TotalCount`), and **cursors are signed** (a cursor held
+  across the release is rejected once — restart from the first page). Every failure
+  carries a **6-digit `Code`** (MMTTNN) in `Notifications[]` — branch/alert on that,
+  not on message text. The relay handles all of this at one seam in `src/gorelo.ts`:
+  it camelizes responses and unwraps the envelope on the way in, pascalizes the create
+  body on the way out, and surfaces the code via `GoreloError.code`. The rest of the
+  codebase keeps its camelCase model (`src/types.ts`).
+- **`POST /v1/tickets` response** — `Data` is `{ "Id": "<uuid>" }` (the ticket's GUID,
+  not a human number). After the client peels the envelope, `extractTicketNumber` reads
+  `id`. Request fields must be PascalCase and **unknown/misspelled fields are rejected
+  with a 400** — the relay only ever sends the documented `CreatePublicTicketCommand`
+  fields.
+- **`GET /v1/tickets`** — cursor-paged list. `pageSize` outside **1–200** is now a
+  400 (was silently clamped), and `sortBy` (`updatedOn` | `createdOn`) / `sortOrder`
+  (`asc` | `desc`) outside those documented values are rejected (was a silent fallback
+  to `updatedOn` / `desc`). `Data` items carry the human-readable `Number` /
+  `DisplayNumber`, so the real ticket number is read back after a create by matching
+  the created `id`.
+- **`agentAssetIds`** — array of agent UUIDs (`PublicDeviceResponse.Id`). Only RMM
   **agent** assets are linkable; `/v1/assets/agents` is the only asset read endpoint,
   so custom/manual assets can't be discovered or mapped.
 - **`tagIds`** — array of int64 tag ids (used for the "Submitted VIA HDB" tag).
-- **`GET /v1/assets/agents`** — a bare array, no pagination; one call fetches the
-  whole fleet.
-- **`statusId` is required** despite being marked `nullable` in the swagger — a
-  create without it returns HTTP 400, so `DEFAULT_STATUS_ID` (default `1` = New) is
-  always sent. `contactId` is optional and left null when no client contact matches.
+- **`GET /v1/assets/agents`** — cursor-paged (since 2026-07); `getAllPages` follows
+  `DataContext.Pagination.NextCursor` to fetch the whole fleet.
+- **`statusId` is required** (now **also** enforced at the schema level for
+  `POST /ticket/public`) — a create without it returns HTTP 400, so `DEFAULT_STATUS_ID`
+  (default `1` = New) is always sent. `contactId` is optional and left null when no
+  client contact matches.
 - **`DEFAULT_RESOLVED_STATUS_ID`** (optional) — the status a Huntress **resolution
   notice** lands in (see "Huntress resolutions" above); set it to your Gorelo
   "Resolved"/"Closed" status id (`GET /v1/tickets/statuses`). Unset → falls back to

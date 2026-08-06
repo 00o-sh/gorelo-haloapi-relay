@@ -1,6 +1,13 @@
 // Hand-written subset of the Gorelo public API types actually used by this relay.
 // Ground truth: https://api.usw.gorelo.io/swagger/v1/swagger.json
 // (Verify against the live spec before deploy — see the runtime-verify checklist in README.)
+//
+// NOTE (2026-08 API): Gorelo now wraps every response in a standard envelope
+// `{ StatusCode, IsSuccess, Data, DataContext, Notifications }`, uses PascalCase
+// field names, and carries paging under `DataContext.Pagination`. These types stay
+// in the relay's camelCase model: `src/gorelo.ts` camelizes responses (and unwraps
+// the envelope) on the way in and pascalizes the create body on the way out, so the
+// shapes below describe the payload AFTER that bridge — not the raw wire format.
 
 /** A queued unit of location-sync work: refresh + reconcile one client's sites. */
 export interface SyncLocationsMessage {
@@ -172,7 +179,12 @@ export interface PublicTicketListItem {
   contactId?: number | null;
 }
 
-/** GET /v1/tickets envelope (PublicTicketListItemModelPagedResponse). */
+/**
+ * GET /v1/tickets — the relay's NORMALIZED list shape. On the wire (2026-08) the
+ * rows are the envelope's `Data` and the paging fields live under
+ * `DataContext.Pagination`; GoreloClient.listTickets flattens both back to this
+ * top-level shape the relay already consumed.
+ */
 export interface PublicTicketListResponse {
   data?: PublicTicketListItem[] | null;
   totalCount?: number;
@@ -216,7 +228,9 @@ export interface PublicDeviceResponse {
 export interface PublicClientResponse {
   id: number;
   name?: string | null;
-  domains?: Array<{ domain?: string | null; name?: string | null }> | null;
+  // Web domains (PublicClientWebDomainResponse): the domain string is `name`
+  // (camelized from `Name`). Not consumed by the sync today; kept for reference.
+  domains?: Array<{ name?: string | null }> | null;
 }
 
 /** GET /v1/contacts?clientid={id} item. */

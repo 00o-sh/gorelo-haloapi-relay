@@ -40,6 +40,31 @@ function installFetch(): void {
 const json = (status: number, data: unknown): Response =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
 
+// --- 2026-08 Gorelo wire-format helpers ----------------------------------------
+// Gorelo now returns PascalCase fields inside a standard envelope. These helpers let
+// the tests keep camelCase fixtures/assertions (the relay's model) while the mocked
+// responses and captured request bodies use the real PascalCase wire shape.
+function rekey(v: unknown, fn: (k: string) => string): unknown {
+  if (Array.isArray(v)) return v.map((x) => rekey(x, fn));
+  if (v && typeof v === "object") {
+    const o: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) o[fn(k)] = rekey(val, fn);
+    return o;
+  }
+  return v;
+}
+const pascal = (v: unknown): unknown => rekey(v, (k) => (k ? k[0]!.toUpperCase() + k.slice(1) : k));
+const camel = (v: unknown): unknown => rekey(v, (k) => (k ? k[0]!.toLowerCase() + k.slice(1) : k));
+
+/** Wrap a payload in the standard success envelope (paging under DataContext.Pagination). */
+const envelope = (data: unknown, pagination?: Record<string, unknown>): Record<string, unknown> => ({
+  StatusCode: 200,
+  IsSuccess: true,
+  Data: pascal(data),
+  DataContext: pagination ? { Pagination: pagination } : null,
+  Notifications: [],
+});
+
 async function seed(): Promise<void> {
   await initSchema(env.DB);
   await env.DB.batch([
@@ -503,27 +528,36 @@ function captureGoreloCreate(
     displayNumber?: string | null;
     listTickets?: boolean;
   } = {},
-): { posted: () => Record<string, unknown> | undefined } {
+): {
+  posted: () => Record<string, unknown> | undefined;
+  postedRaw: () => Record<string, unknown> | undefined;
+} {
   const uuid = opts.uuid ?? "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a";
   const number = opts.number ?? 264274883401817;
   const displayNumber = opts.displayNumber ?? "T-100234";
-  let posted: Record<string, unknown> | undefined;
+  let posted: Record<string, unknown> | undefined; // the raw (PascalCase) request body
   routes.push({
     method: "POST",
     match: (u) => u.pathname === "/v1/tickets",
     handler: async (r) => {
       posted = (await r.json()) as Record<string, unknown>;
-      return json(200, { id: uuid });
+      return json(200, envelope({ id: uuid }));
     },
   });
   if (opts.listTickets !== false) {
     routes.push({
       method: "GET",
       match: (u) => u.pathname === "/v1/tickets",
-      handler: () => json(200, { data: [{ id: uuid, number, displayNumber }], hasMore: false }),
+      handler: () =>
+        json(200, envelope([{ id: uuid, number, displayNumber }], { NextCursor: null, HasMore: false })),
     });
   }
-  return { posted: () => posted };
+  return {
+    // posted(): the request body in the relay's camelCase model (asserted against);
+    // postedRaw(): the exact PascalCase body sent on the wire.
+    posted: () => (posted ? (camel(posted) as Record<string, unknown>) : undefined),
+    postedRaw: () => posted,
+  };
 }
 
 describe("Halo deferred ticket create (/tickets queues, /actions creates)", () => {
@@ -642,7 +676,7 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     routes.push({
       method: "GET",
       match: (u) => u.pathname === "/v1/tickets",
-      handler: () => json(200, { data: [], hasMore: false }),
+      handler: () => json(200, envelope([], { HasMore: false })),
     });
     const created = await req("/tickets", {
       method: "POST",
@@ -755,21 +789,24 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
       method: "GET",
       match: (u) => u.pathname === `/v1/assets/agents/${AGENT_UUID}`,
       handler: () =>
-        json(200, {
-          id: AGENT_UUID,
-          name: "PC-01",
-          osName: "Microsoft Windows 11 Enterprise",
-          osVersion: "25H2",
-          manufacturer: "Microsoft Corporation",
-          model: "Virtual Machine",
-          cpu: "AMD EPYC 9V74 80-Core Processor",
-          memory: "32",
-          serialNo: "SN-RICH",
-          localIPAddress: "10.100.1.13",
-          publicIPAddress: "68.211.123.114",
-          lastLoggedOnUserUpn: "cmaidan@sph.health",
-          lastBootUpTime: "2020-01-01T00:00:00", // long ago -> relative "years ago"
-        }),
+        json(
+          200,
+          envelope({
+            id: AGENT_UUID,
+            name: "PC-01",
+            osName: "Microsoft Windows 11 Enterprise",
+            osVersion: "25H2",
+            manufacturer: "Microsoft Corporation",
+            model: "Virtual Machine",
+            cpu: "AMD EPYC 9V74 80-Core Processor",
+            memory: "32",
+            serialNo: "SN-RICH",
+            localIPAddress: "10.100.1.13",
+            publicIPAddress: "68.211.123.114",
+            lastLoggedOnUserUpn: "cmaidan@sph.health",
+            lastBootUpTime: "2020-01-01T00:00:00", // long ago -> relative "years ago"
+          }),
+        ),
     });
     const created = await req("/tickets", {
       method: "POST",
@@ -1430,6 +1467,24 @@ describe("Halo eager create — matched Tier2 product", () => {
     expect(String(cap.posted()?.description)).toContain("user@corp.com");
   });
 
+  it("sends the create body in PascalCase and never leaks camelCase/unknown fields", async () => {
+    // 2026-08 Gorelo requires PascalCase request fields and 400s on unknown ones, so
+    // the wire body must be PascalCase (the relay models the command in camelCase).
+    const cap = captureGoreloCreate();
+    await req("/tickets", tier2Init([{ summary: "Printer down", details_html: reportHtml({ email: "user@corp.com" }) }]));
+    const raw = cap.postedRaw()!;
+    expect(raw).toMatchObject({
+      Title: expect.any(String),
+      StatusId: expect.any(Number),
+      GroupId: expect.any(Number),
+      TypeId: expect.any(Number),
+      ClientId: expect.any(Number),
+      SendTicketCreatedEmail: expect.any(Boolean),
+    });
+    // No camelCase survivors — a stray camelCase key would be an unknown field (400).
+    for (const k of Object.keys(raw)) expect(k[0]).toBe(k[0]!.toUpperCase());
+  });
+
   it("a follow-up /actions note is a no-op — no duplicate ticket", async () => {
     let creates = 0;
     routes.push({
@@ -1437,14 +1492,14 @@ describe("Halo eager create — matched Tier2 product", () => {
       match: (u) => u.pathname === "/v1/tickets",
       handler: () => {
         creates++;
-        return json(200, { id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a" });
+        return json(200, envelope({ id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a" }));
       },
     });
     routes.push({
       method: "GET",
       match: (u) => u.pathname === "/v1/tickets",
       handler: () =>
-        json(200, { data: [{ id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a", number: 500779 }], hasMore: false }),
+        json(200, envelope([{ id: "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a", number: 500779 }], { HasMore: false })),
     });
     const created = await req(
       "/tickets",

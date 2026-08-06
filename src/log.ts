@@ -33,7 +33,11 @@ export function breadcrumb(msg: string): void {
  * to its HTTP status, other errors to name + message. Never the raw error body.
  */
 export function describeError(err: unknown): string {
-  if (err instanceof GoreloError) return `GoreloError status=${err.status}`;
+  if (err instanceof GoreloError) {
+    // Include the 6-digit Notifications code when Gorelo returned one — it is the
+    // stable, non-PII failure identifier to triage on (see GoreloError.code).
+    return `GoreloError status=${err.status}${err.code ? ` code=${err.code}` : ""}`;
+  }
   if (err instanceof Error) return `${err.name}: ${err.message}`;
   return String(err);
 }

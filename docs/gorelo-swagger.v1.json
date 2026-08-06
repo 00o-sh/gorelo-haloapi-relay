@@ -11,8 +11,10 @@
         "tags": [
           "Alerts"
         ],
+        "summary": "Posts an external alert against a client for the service provider.",
         "operationId": "public-cluster_",
         "requestBody": {
+          "description": "Alert details.",
           "content": {
             "application/json-patch+json": {
               "schema": {
@@ -42,17 +44,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "boolean"
+                  "$ref": "#/components/schemas/public-cluster_BooleanBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "boolean"
+                  "$ref": "#/components/schemas/public-cluster_BooleanBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "boolean"
+                  "$ref": "#/components/schemas/public-cluster_BooleanBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -65,12 +127,13 @@
         "tags": [
           "Assets"
         ],
+        "summary": "Lists agent (managed device) assets for the service provider using cursor pagination.\r\nResults are sorted by `createdOn` descending (newest first).",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "cursor",
             "in": "query",
-            "style": "form",
+            "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "schema": {
               "type": "string"
             }
@@ -78,7 +141,7 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
+            "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -92,17 +155,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponseListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponseListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponseListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -115,13 +238,14 @@
         "tags": [
           "Assets"
         ],
+        "summary": "Gets a single agent (managed device) asset by id.",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Device identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -134,17 +258,97 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponseBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponseBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicDeviceResponseBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -157,12 +361,13 @@
         "tags": [
           "Clients"
         ],
+        "summary": "Lists clients for the service provider using cursor pagination.\r\nResults are sorted by client id ascending (oldest first).",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "cursor",
             "in": "query",
-            "style": "form",
+            "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "schema": {
               "type": "string"
             }
@@ -170,7 +375,7 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
+            "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -184,17 +389,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -205,8 +470,10 @@
         "tags": [
           "Clients"
         ],
+        "summary": "Creates a client (and its default location) for the service provider.",
         "operationId": "public-cluster_",
         "requestBody": {
+          "description": "Client details.",
           "content": {
             "application/json-patch+json": {
               "schema": {
@@ -236,17 +503,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -257,8 +584,10 @@
         "tags": [
           "Clients"
         ],
+        "summary": "Updates an existing client. Only supplied (non-null) fields are changed.",
         "operationId": "public-cluster_",
         "requestBody": {
+          "description": "Client fields to update; `Id` identifies the client.",
           "content": {
             "application/json-patch+json": {
               "schema": {
@@ -288,17 +617,97 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -311,13 +720,14 @@
         "tags": [
           "Clients"
         ],
+        "summary": "Gets a single client by id.",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Client identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -330,17 +740,97 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicClientResponseBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -353,13 +843,14 @@
         "tags": [
           "Clients"
         ],
+        "summary": "Lists the locations for a given client.",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "clientId",
             "in": "path",
+            "description": "Client identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -372,26 +863,97 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponse"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponseListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponse"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponseListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponse"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponseListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -404,12 +966,13 @@
         "tags": [
           "Contacts"
         ],
+        "summary": "Lists contacts for the service provider using cursor pagination, optionally filtered by client.\r\nResults are sorted by contact id ascending (oldest first).",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "clientId",
             "in": "query",
-            "style": "form",
+            "description": "Optional client identifier to filter contacts by.",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -418,7 +981,7 @@
           {
             "name": "cursor",
             "in": "query",
-            "style": "form",
+            "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "schema": {
               "type": "string"
             }
@@ -426,7 +989,7 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
+            "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -440,17 +1003,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponsePagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -461,8 +1084,10 @@
         "tags": [
           "Contacts"
         ],
+        "summary": "Creates a contact under a client.",
         "operationId": "public-cluster_",
         "requestBody": {
+          "description": "Contact details.",
           "content": {
             "application/json-patch+json": {
               "schema": {
@@ -492,17 +1117,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -513,8 +1198,10 @@
         "tags": [
           "Contacts"
         ],
+        "summary": "Updates an existing contact. `ContactId` identifies the contact.",
         "operationId": "public-cluster_",
         "requestBody": {
+          "description": "Contact fields to update.",
           "content": {
             "application/json-patch+json": {
               "schema": {
@@ -544,17 +1231,97 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -567,13 +1334,14 @@
         "tags": [
           "Contacts"
         ],
+        "summary": "Gets a single contact by id.",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "id",
             "in": "path",
+            "description": "Contact identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -586,17 +1354,97 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicContactResponseBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -609,12 +1457,13 @@
         "tags": [
           "Organization"
         ],
+        "summary": "Lists users (technicians) for the service provider using cursor pagination.\r\nResults are sorted by user id ascending (oldest first).",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "cursor",
             "in": "query",
-            "style": "form",
+            "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "schema": {
               "type": "string"
             }
@@ -622,7 +1471,7 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
+            "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -636,17 +1485,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicUserModelPagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicUserModelListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicUserModelPagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicUserModelListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicUserModelPagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicUserModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -659,6 +1568,7 @@
         "tags": [
           "Organization"
         ],
+        "summary": "Lists the technician groups configured for the service provider.",
         "operationId": "public-cluster_",
         "responses": {
           "200": {
@@ -666,26 +1576,57 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicGroupModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicGroupModelListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicGroupModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicGroupModelListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicGroupModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicGroupModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -698,8 +1639,10 @@
         "tags": [
           "Tickets"
         ],
+        "summary": "Creates a ticket for the authenticated service provider.",
         "operationId": "public-cluster_",
         "requestBody": {
+          "description": "Ticket details.",
           "content": {
             "application/json-patch+json": {
               "schema": {
@@ -729,17 +1672,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResult"
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResultBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResult"
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResultBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResult"
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResultBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -750,12 +1753,13 @@
         "tags": [
           "Tickets"
         ],
+        "summary": "Lists tickets for the service provider using cursor pagination.\r\nDefault sort is `updatedOn desc`. sortBy accepts only\r\n`updatedOn` or `createdOn`; sortOrder accepts only\r\n`asc` or `desc` (case-insensitive) — any other value is rejected with a 400.",
         "operationId": "public-cluster_",
         "parameters": [
           {
             "name": "cursor",
             "in": "query",
-            "style": "form",
+            "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "schema": {
               "type": "string"
             }
@@ -763,7 +1767,7 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
+            "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -773,7 +1777,7 @@
           {
             "name": "sortBy",
             "in": "query",
-            "style": "form",
+            "description": "Sort column: `updatedOn` (default) or `createdOn`.",
             "schema": {
               "type": "string",
               "default": "updatedOn"
@@ -782,7 +1786,7 @@
           {
             "name": "sortOrder",
             "in": "query",
-            "style": "form",
+            "description": "Sort direction: `asc` or `desc` (default).",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -795,17 +1799,77 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelPagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelPagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelPagedResponse"
+                  "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -818,6 +1882,7 @@
         "tags": [
           "Tickets"
         ],
+        "summary": "Lists the ticket statuses configured for the service provider.",
         "operationId": "public-cluster_",
         "responses": {
           "200": {
@@ -825,26 +1890,57 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModelListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModelListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -857,6 +1953,7 @@
         "tags": [
           "Tickets"
         ],
+        "summary": "Lists the ticket tags configured for the service provider.",
         "operationId": "public-cluster_",
         "responses": {
           "200": {
@@ -864,26 +1961,57 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicTagListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicTagListItemModelListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicTagListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicTagListItemModelListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicTagListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicTagListItemModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -896,6 +2024,7 @@
         "tags": [
           "Tickets"
         ],
+        "summary": "Lists the ticket types configured for the service provider.",
         "operationId": "public-cluster_",
         "responses": {
           "200": {
@@ -903,26 +2032,57 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModelListBaseResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModelListBaseResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModel"
-                  }
+                  "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
                 }
               }
             }
@@ -943,395 +2103,738 @@
         "type": "integer",
         "format": "int32"
       },
-      "public-cluster_CreatePublicClientCommand": {
+      "public-cluster_BooleanBaseResponse": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "nullable": true
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
           },
-          "billingName": {
-            "type": "string",
-            "nullable": true
+          "IsSuccess": {
+            "type": "boolean"
           },
-          "alternateName": {
-            "type": "string",
-            "nullable": true
+          "Data": {
+            "type": "boolean"
           },
-          "domain": {
-            "type": "string",
-            "nullable": true
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
           },
-          "location": {
-            "$ref": "#/components/schemas/public-cluster_PublicClientLocationRequest"
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
       },
-      "public-cluster_CreatePublicContactCommand": {
+      "public-cluster_CreatePublicClientCommand": {
+        "required": [
+          "Location",
+          "Name"
+        ],
         "type": "object",
         "properties": {
-          "firstName": {
+          "Name": {
+            "minLength": 1,
             "type": "string",
+            "description": "Client display name. Required.",
+            "example": "Contoso Ltd"
+          },
+          "BillingName": {
+            "type": "string",
+            "description": "Optional name used on invoices when it differs from the display name.",
             "nullable": true
           },
-          "lastName": {
+          "AlternateName": {
             "type": "string",
+            "description": "Optional alternate / trading name.",
             "nullable": true
           },
-          "clientId": {
+          "Domain": {
+            "type": "string",
+            "description": "Optional primary web domain for the client (e.g. contoso.com).",
+            "nullable": true
+          },
+          "Location": {
+            "$ref": "#/components/schemas/public-cluster_PublicClientLocationRequest"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request body for creating a client, along with its default location."
+      },
+      "public-cluster_CreatePublicContactCommand": {
+        "required": [
+          "ClientId",
+          "FirstName",
+          "LastName",
+          "PrimaryEmail"
+        ],
+        "type": "object",
+        "properties": {
+          "FirstName": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Contact first name. Required.",
+            "example": "Jane"
+          },
+          "LastName": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Contact last name. Required.",
+            "example": "Doe"
+          },
+          "ClientId": {
             "type": "integer",
+            "description": "Identifier of the client the contact belongs to. Required.",
             "format": "int64"
           },
-          "clientLocationId": {
+          "ClientLocationId": {
             "type": "integer",
+            "description": "Identifier of the client location the contact belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "primaryEmail": {
+          "PrimaryEmail": {
+            "minLength": 1,
             "type": "string",
-            "nullable": true
+            "description": "Primary email address. Required.",
+            "example": "jane.doe@contoso.com"
           },
-          "secondaryEmail": {
+          "SecondaryEmail": {
             "type": "array",
             "items": {
               "type": "string"
             },
+            "description": "Additional (secondary) email addresses.",
             "nullable": true
           },
-          "mobilePhone": {
+          "MobilePhone": {
             "type": "string",
-            "nullable": true
+            "description": "Mobile phone number (without country code)."
           },
-          "mobilePhoneCountryCode": {
+          "MobilePhoneCountryCode": {
             "type": "string",
-            "nullable": true
+            "description": "Mobile phone country calling code (e.g. +1)."
           },
-          "officePhone": {
+          "OfficePhone": {
             "type": "string",
-            "nullable": true
+            "description": "Office phone number (without country code)."
           },
-          "officePhoneCountryCode": {
+          "OfficePhoneCountryCode": {
             "type": "string",
-            "nullable": true
+            "description": "Office phone country calling code (e.g. +1)."
           },
-          "jobTitle": {
+          "JobTitle": {
             "type": "string",
-            "nullable": true
+            "description": "Contact job title."
           },
-          "department": {
+          "Department": {
             "type": "string",
-            "nullable": true
+            "description": "Contact department."
           },
-          "timeZone": {
+          "TimeZone": {
             "type": "string",
-            "nullable": true
+            "description": "IANA time zone identifier for the contact (e.g. America/New_York)."
           },
-          "description": {
+          "Description": {
             "type": "string",
-            "nullable": true
+            "description": "Free-text description / notes for the contact."
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Request body for creating a contact under a client."
       },
       "public-cluster_CreatePublicTicketCommand": {
+        "required": [
+          "GroupId",
+          "StatusId",
+          "Title",
+          "TypeId"
+        ],
         "type": "object",
         "properties": {
-          "title": {
+          "Title": {
+            "minLength": 1,
             "type": "string",
-            "nullable": true
+            "description": "Ticket title/subject. Required.",
+            "example": "Printer on 3rd floor is offline"
           },
-          "createdByName": {
+          "CreatedByName": {
             "type": "string",
+            "description": "Display name to record as the ticket creator when no contact is resolved.",
             "nullable": true
           },
-          "clientId": {
+          "ClientId": {
             "type": "integer",
+            "description": "Identifier of the client the ticket belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "locationId": {
+          "LocationId": {
             "type": "integer",
+            "description": "Identifier of the client location the ticket belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "contactId": {
+          "ContactId": {
             "type": "integer",
+            "description": "Identifier of the primary contact for the ticket.",
             "format": "int64",
             "nullable": true
           },
-          "ccContactIds": {
+          "CcContactIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
+            "description": "Identifiers of additional (CC) contacts.",
             "nullable": true
           },
-          "statusId": {
+          "StatusId": {
             "type": "integer",
+            "description": "Initial status identifier. Required; must be an existing status for the service provider.",
             "format": "int64",
-            "nullable": true
+            "example": 1
           },
-          "groupId": {
+          "GroupId": {
             "type": "integer",
-            "format": "int64"
+            "description": "Identifier of the technician group the ticket is assigned to. Required.",
+            "format": "int64",
+            "example": 101
           },
-          "description": {
+          "Description": {
             "type": "string",
+            "description": "Free-text ticket description / body.",
             "nullable": true
           },
-          "priorityId": {
+          "PriorityId": {
             "$ref": "#/components/schemas/public-cluster_PublicTicketPriority"
           },
-          "sourceId": {
+          "SourceId": {
             "$ref": "#/components/schemas/public-cluster_TicketSource"
           },
-          "typeId": {
+          "TypeId": {
             "type": "integer",
-            "format": "int64"
+            "description": "Ticket type identifier. Required.",
+            "format": "int64",
+            "example": 1
           },
-          "leadAssigneeId": {
+          "LeadAssigneeId": {
             "type": "integer",
+            "description": "Identifier of the lead assignee (technician).",
             "format": "int64",
             "nullable": true
           },
-          "assistingAssigneeIds": {
+          "AssistingAssigneeIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
+            "description": "Identifiers of assisting assignees (technicians).",
             "nullable": true
           },
-          "watcherIds": {
+          "WatcherIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
+            "description": "Identifiers of technicians watching the ticket.",
             "nullable": true
           },
-          "tagIds": {
+          "TagIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
+            "description": "Identifiers of tags to apply to the ticket.",
             "nullable": true
           },
-          "agentAssetIds": {
+          "AgentAssetIds": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "uuid"
             },
+            "description": "Identifiers of agent (managed device) assets to link to the ticket.",
             "nullable": true
           },
-          "customAssetIds": {
+          "CustomAssetIds": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "uuid"
             },
+            "description": "Identifiers of custom assets to link to the ticket.",
             "nullable": true
           },
-          "uptimeIds": {
+          "UptimeIds": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "uuid"
             },
+            "description": "Identifiers of uptime monitors to link to the ticket.",
             "nullable": true
           },
-          "sendTicketCreatedEmail": {
+          "SendTicketCreatedEmail": {
             "type": "boolean",
+            "description": "When true, sends a \"ticket created\" email to the contact. Defaults to false.",
             "nullable": true
           },
-          "isUnread": {
+          "IsUnread": {
             "type": "boolean",
+            "description": "Whether the ticket is created in an unread state. Defaults to true.",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Request body for creating a ticket. The owning service provider is resolved from the\r\nrequest context, not from the body."
       },
       "public-cluster_CreatePublicTicketResult": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "string",
+            "description": "Identifier of the newly created ticket.",
             "format": "uuid",
             "nullable": true
           }
         },
+        "additionalProperties": false,
+        "description": "Result of a create-ticket request."
+      },
+      "public-cluster_CreatePublicTicketResultBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_CreatePublicTicketResult"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
         "additionalProperties": false
+      },
+      "public-cluster_Error": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "pattern": "^[0-9]{6}$",
+            "type": "string",
+            "description": "6-digit MMTTNN error code. See the Public API error-code registry.",
+            "example": "070101"
+          },
+          "Message": {
+            "type": "string"
+          },
+          "PropertyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "ActionHint": {
+            "type": "string",
+            "nullable": true
+          },
+          "DocUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_ErrorDataContext": {
+        "type": "object",
+        "properties": {
+          "TraceId": {
+            "type": "string",
+            "description": "Request correlation id. Quote this when reporting a problem.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "The `DataContext` of an error response: carries the correlation id for the failed\r\nrequest."
+      },
+      "public-cluster_HttpStatusCode": {
+        "enum": [
+          100,
+          101,
+          102,
+          103,
+          200,
+          201,
+          202,
+          203,
+          204,
+          205,
+          206,
+          207,
+          208,
+          226,
+          300,
+          301,
+          302,
+          303,
+          304,
+          305,
+          306,
+          307,
+          308,
+          400,
+          401,
+          402,
+          403,
+          404,
+          405,
+          406,
+          407,
+          408,
+          409,
+          410,
+          411,
+          412,
+          413,
+          414,
+          415,
+          416,
+          417,
+          421,
+          422,
+          423,
+          424,
+          426,
+          428,
+          429,
+          431,
+          451,
+          500,
+          501,
+          502,
+          503,
+          504,
+          505,
+          506,
+          507,
+          508,
+          510,
+          511
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "public-cluster_ObjectBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "nullable": true
+          },
+          "DataContext": {
+            "$ref": "#/components/schemas/public-cluster_ErrorDataContext"
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PaginatedResponse": {
+        "type": "object",
+        "properties": {
+          "NextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "PreviousCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "HasMore": {
+            "type": "boolean"
+          },
+          "HasPrevious": {
+            "type": "boolean"
+          },
+          "TotalCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PaginationDataContext": {
+        "type": "object",
+        "properties": {
+          "Pagination": {
+            "$ref": "#/components/schemas/public-cluster_PaginatedResponse"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The `DataContext` of a cursor-paginated success response: carries the paging metadata\r\nfor the returned page."
       },
       "public-cluster_PostAlertRequest": {
+        "required": [
+          "ClientId",
+          "Name",
+          "Resource"
+        ],
         "type": "object",
         "properties": {
-          "name": {
+          "Name": {
+            "minLength": 1,
             "type": "string",
-            "nullable": true
+            "description": "Alert name / title. Required.",
+            "example": "Disk usage above 90%"
           },
-          "clientId": {
+          "ClientId": {
             "type": "integer",
+            "description": "Identifier of the client the alert relates to. Required.",
             "format": "int64"
           },
-          "resource": {
+          "Resource": {
+            "minLength": 1,
             "type": "string",
-            "nullable": true
+            "description": "Resource the alert is raised for (e.g. host name, service).",
+            "example": "SRV-DB-01"
           },
-          "severity": {
+          "Severity": {
             "$ref": "#/components/schemas/public-cluster_AlertLevel"
           },
-          "description": {
+          "Description": {
             "type": "string",
-            "nullable": true
+            "description": "Free-text alert description."
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Request body for posting an external alert against a client."
       },
       "public-cluster_PublicClientLocationRequest": {
+        "required": [
+          "Name"
+        ],
         "type": "object",
         "properties": {
-          "name": {
+          "Name": {
+            "minLength": 1,
             "type": "string",
+            "description": "Location display name. Required.",
+            "example": "Head Office"
+          },
+          "PhoneCountryCode": {
+            "type": "string",
+            "description": "Phone country calling code (e.g. +1).",
             "nullable": true
           },
-          "phoneCountryCode": {
+          "Phone": {
             "type": "string",
+            "description": "Phone number (without country code).",
             "nullable": true
           },
-          "phone": {
+          "PhoneExt": {
             "type": "string",
+            "description": "Phone extension.",
             "nullable": true
           },
-          "phoneExt": {
+          "Address1": {
             "type": "string",
+            "description": "Address line 1.",
             "nullable": true
           },
-          "address1": {
+          "Address2": {
             "type": "string",
+            "description": "Address line 2.",
             "nullable": true
           },
-          "address2": {
+          "City": {
             "type": "string",
+            "description": "City.",
             "nullable": true
           },
-          "city": {
+          "State": {
             "type": "string",
+            "description": "State / province.",
             "nullable": true
           },
-          "state": {
+          "Country": {
             "type": "string",
+            "description": "Country.",
             "nullable": true
           },
-          "country": {
+          "PostalCode": {
             "type": "string",
+            "description": "Postal / ZIP code.",
             "nullable": true
           },
-          "postalCode": {
+          "TimeZone": {
             "type": "string",
-            "nullable": true
-          },
-          "timeZone": {
-            "type": "string",
+            "description": "IANA time zone identifier for the location (e.g. America/New_York).",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Location details supplied when creating a client's default location."
       },
       "public-cluster_PublicClientLocationResponse": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Location identifier.",
             "format": "int64"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Location display name."
           },
-          "clientId": {
+          "ClientId": {
             "type": "integer",
+            "description": "Identifier of the client this location belongs to.",
             "format": "int64"
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "primaryContactId": {
+          "PrimaryContactId": {
             "type": "integer",
+            "description": "Identifier of the primary contact for the location.",
             "format": "int64",
             "nullable": true
           },
-          "phoneCountryCode": {
+          "PhoneCountryCode": {
             "type": "string",
-            "nullable": true
+            "description": "Phone country calling code (e.g. +1)."
           },
-          "phone": {
+          "Phone": {
             "type": "string",
-            "nullable": true
+            "description": "Phone number (without country code)."
           },
-          "phoneExt": {
+          "PhoneExt": {
             "type": "string",
-            "nullable": true
+            "description": "Phone extension."
           },
-          "billingContactIds": {
+          "BillingContactIds": {
             "type": "string",
-            "nullable": true
+            "description": "Comma-separated identifiers of billing contacts."
           },
-          "address1": {
+          "Address1": {
             "type": "string",
-            "nullable": true
+            "description": "Address line 1."
           },
-          "address2": {
+          "Address2": {
             "type": "string",
-            "nullable": true
+            "description": "Address line 2."
           },
-          "city": {
+          "City": {
             "type": "string",
-            "nullable": true
+            "description": "City."
           },
-          "state": {
+          "State": {
             "type": "string",
-            "nullable": true
+            "description": "State / province."
           },
-          "country": {
+          "Country": {
             "type": "string",
-            "nullable": true
+            "description": "Country."
           },
-          "postalCode": {
+          "PostalCode": {
             "type": "string",
-            "nullable": true
+            "description": "Postal / ZIP code."
           },
-          "geoLocationLatitude": {
+          "GeoLocationLatitude": {
             "type": "number",
+            "description": "Geolocation latitude.",
             "format": "double",
             "nullable": true
           },
-          "geoLocationLongitude": {
+          "GeoLocationLongitude": {
             "type": "number",
+            "description": "Geolocation longitude.",
             "format": "double",
             "nullable": true
           },
-          "timeZone": {
+          "TimeZone": {
             "type": "string",
+            "description": "IANA time zone identifier for the location."
+          },
+          "IsDefault": {
+            "type": "boolean",
+            "description": "Whether this is the client's default location.",
             "nullable": true
           },
-          "isDefault": {
+          "IsDefaultBilling": {
             "type": "boolean",
+            "description": "Whether this is the client's default billing location.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A client location. Timestamps are UTC."
+      },
+      "public-cluster_PublicClientLocationResponseListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicClientLocationResponse"
+            },
             "nullable": true
           },
-          "isDefaultBilling": {
-            "type": "boolean",
-            "nullable": true
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -1339,76 +2842,105 @@
       "public-cluster_PublicClientResponse": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Client identifier.",
             "format": "int64"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Client display name."
           },
-          "status": {
+          "Status": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "billingName": {
+          "BillingName": {
             "type": "string",
-            "nullable": true
+            "description": "Name used on invoices."
           },
-          "alternateName": {
+          "AlternateName": {
             "type": "string",
-            "nullable": true
+            "description": "Alternate / trading name."
           },
-          "isDefault": {
+          "IsDefault": {
             "type": "boolean",
+            "description": "Whether this is the default client.",
             "nullable": true
           },
-          "domains": {
+          "Domains": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/public-cluster_PublicClientWebDomainResponse"
             },
-            "nullable": true
+            "description": "Web domains associated with the client."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A client (customer organization). Timestamps are UTC."
+      },
+      "public-cluster_PublicClientResponseBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
       },
-      "public-cluster_PublicClientResponsePagedResponse": {
+      "public-cluster_PublicClientResponseListBaseResponse": {
         "type": "object",
         "properties": {
-          "data": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/public-cluster_PublicClientResponse"
             },
             "nullable": true
           },
-          "totalCount": {
-            "type": "integer",
-            "format": "int32"
+          "DataContext": {
+            "$ref": "#/components/schemas/public-cluster_PaginationDataContext"
           },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "previousCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "hasPrevious": {
-            "type": "boolean"
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -1416,49 +2948,56 @@
       "public-cluster_PublicClientWebDomainResponse": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Web domain identifier.",
             "format": "int64"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Domain name (e.g. contoso.com)."
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "expirationDate": {
+          "ExpirationDate": {
             "type": "string",
+            "description": "Domain registration expiration date (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "isDateSetManually": {
-            "type": "boolean"
+          "IsDateSetManually": {
+            "type": "boolean",
+            "description": "Whether the expiration date was set manually rather than resolved automatically."
           },
-          "statusId": {
+          "StatusId": {
             "type": "integer",
+            "description": "Domain status identifier.",
             "format": "int64",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "A web domain associated with a client. Timestamps are UTC."
       },
       "public-cluster_PublicCodeModel": {
         "type": "object",
         "properties": {
-          "id": {
-            "nullable": true
+          "Id": {
+            "type": "integer",
+            "format": "int64"
           },
-          "name": {
-            "type": "string",
-            "nullable": true
+          "Name": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -1466,119 +3005,151 @@
       "public-cluster_PublicContactResponse": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Contact identifier.",
             "format": "int64"
           },
-          "firstName": {
+          "FirstName": {
             "type": "string",
-            "nullable": true
+            "description": "Contact first name."
           },
-          "lastName": {
+          "LastName": {
             "type": "string",
-            "nullable": true
+            "description": "Contact last name."
           },
-          "status": {
+          "Status": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "clientId": {
+          "ClientId": {
             "type": "integer",
+            "description": "Identifier of the client the contact belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "clientLocationId": {
+          "ClientLocationId": {
             "type": "integer",
+            "description": "Identifier of the client location the contact belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "primaryEmail": {
+          "PrimaryEmail": {
             "type": "string",
-            "nullable": true
+            "description": "Primary email address."
           },
-          "alias": {
+          "Alias": {
             "type": "string",
-            "nullable": true
+            "description": "Contact alias."
           },
-          "mobilePhone": {
+          "MobilePhone": {
             "type": "string",
-            "nullable": true
+            "description": "Mobile phone number (without country code)."
           },
-          "mobilePhoneCountryCode": {
+          "MobilePhoneCountryCode": {
             "type": "string",
-            "nullable": true
+            "description": "Mobile phone country calling code (e.g. +1)."
           },
-          "officePhone": {
+          "OfficePhone": {
             "type": "string",
-            "nullable": true
+            "description": "Office phone number (without country code)."
           },
-          "officePhoneCountryCode": {
+          "OfficePhoneCountryCode": {
             "type": "string",
-            "nullable": true
+            "description": "Office phone country calling code (e.g. +1)."
           },
-          "jobTitle": {
+          "JobTitle": {
             "type": "string",
-            "nullable": true
+            "description": "Contact job title."
           },
-          "department": {
+          "Department": {
             "type": "string",
-            "nullable": true
+            "description": "Contact department."
           },
-          "timeZone": {
+          "TimeZone": {
             "type": "string",
-            "nullable": true
+            "description": "IANA time zone identifier for the contact."
           },
-          "description": {
+          "Description": {
             "type": "string",
-            "nullable": true
+            "description": "Free-text description / notes."
           },
-          "isTemporaryContact": {
-            "type": "boolean"
+          "IsTemporaryContact": {
+            "type": "boolean",
+            "description": "Whether the contact is a temporary (auto-created) contact."
           },
-          "mergedWithContactId": {
+          "MergedWithContactId": {
             "type": "integer",
+            "description": "Identifier of the contact this one was merged with, if any.",
             "format": "int64",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "A contact belonging to a client. Timestamps are UTC."
       },
-      "public-cluster_PublicContactResponsePagedResponse": {
+      "public-cluster_PublicContactResponseBaseResponse": {
         "type": "object",
         "properties": {
-          "data": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicContactResponseListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/public-cluster_PublicContactResponse"
             },
             "nullable": true
           },
-          "totalCount": {
-            "type": "integer",
-            "format": "int32"
+          "DataContext": {
+            "$ref": "#/components/schemas/public-cluster_PaginationDataContext"
           },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "previousCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "hasPrevious": {
-            "type": "boolean"
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -1586,182 +3157,216 @@
       "public-cluster_PublicDeviceResponse": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "string",
+            "description": "Device identifier.",
             "format": "uuid"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Device name."
           },
-          "status": {
+          "Status": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "clientId": {
+          "ClientId": {
             "type": "integer",
+            "description": "Identifier of the client the device belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "clientLocationId": {
+          "ClientLocationId": {
             "type": "integer",
+            "description": "Identifier of the client location the device belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC). Default sort key (ascending) for the agents list endpoint.",
             "format": "date-time"
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "displayName": {
+          "DisplayName": {
             "type": "string",
-            "nullable": true
+            "description": "Friendly display name."
           },
-          "description": {
+          "Description": {
             "type": "string",
-            "nullable": true
+            "description": "Free-text description."
           },
-          "timeZone": {
+          "TimeZone": {
             "type": "string",
-            "nullable": true
+            "description": "IANA time zone identifier for the device."
           },
-          "lastBootUpTime": {
+          "LastBootUpTime": {
             "type": "string",
+            "description": "Last boot-up time (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "lastDisconnectDateTime": {
+          "LastDisconnectDateTime": {
             "type": "string",
+            "description": "Last disconnect time (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "lastLoggedOnUser": {
+          "LastLoggedOnUser": {
             "type": "string",
-            "nullable": true
+            "description": "Last logged-on user (display name)."
           },
-          "lastLoggedOnUserUpn": {
+          "LastLoggedOnUserUpn": {
             "type": "string",
-            "nullable": true
+            "description": "Last logged-on user principal name (UPN)."
           },
-          "lastLoggedOnUserDatetime": {
+          "LastLoggedOnUserDatetime": {
             "type": "string",
+            "description": "Timestamp of the last user logon (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "os": {
+          "Os": {
             "type": "string",
-            "nullable": true
+            "description": "Operating system (full string)."
           },
-          "osType": {
+          "OsType": {
             "type": "string",
-            "nullable": true
+            "description": "Operating system type."
           },
-          "osName": {
+          "OsName": {
             "type": "string",
-            "nullable": true
+            "description": "Operating system name."
           },
-          "osVersion": {
+          "OsVersion": {
             "type": "string",
-            "nullable": true
+            "description": "Operating system version."
           },
-          "osArchitecture": {
+          "OsArchitecture": {
             "type": "string",
-            "nullable": true
+            "description": "Operating system architecture."
           },
-          "hardwareArchitecture": {
+          "HardwareArchitecture": {
             "type": "string",
-            "nullable": true
+            "description": "Hardware architecture."
           },
-          "hardwareType": {
+          "HardwareType": {
             "type": "string",
-            "nullable": true
+            "description": "Hardware type."
           },
-          "manufacturer": {
+          "Manufacturer": {
             "type": "string",
-            "nullable": true
+            "description": "Hardware manufacturer."
           },
-          "model": {
+          "Model": {
             "type": "string",
-            "nullable": true
+            "description": "Hardware model."
           },
-          "serialNo": {
+          "SerialNo": {
             "type": "string",
-            "nullable": true
+            "description": "Hardware serial number."
           },
-          "warrantyExpiryDate": {
+          "WarrantyExpiryDate": {
             "type": "string",
+            "description": "Warranty expiry date (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "cpu": {
+          "Cpu": {
             "type": "string",
-            "nullable": true
+            "description": "CPU description."
           },
-          "memory": {
+          "Memory": {
             "type": "string",
-            "nullable": true
+            "description": "Total memory."
           },
-          "disk": {
+          "Disk": {
             "type": "string",
-            "nullable": true
+            "description": "Disk description."
           },
-          "localIPAddress": {
+          "LocalIPAddress": {
             "type": "string",
-            "nullable": true
+            "description": "Local IP address."
           },
-          "publicIPAddress": {
+          "PublicIPAddress": {
             "type": "string",
-            "nullable": true
+            "description": "Public IP address."
           },
-          "uuid": {
+          "Uuid": {
             "type": "string",
-            "nullable": true
+            "description": "Device UUID."
           },
-          "shellVersion": {
+          "ShellVersion": {
             "type": "string",
-            "nullable": true
+            "description": "Agent shell version."
           },
-          "rmmVersion": {
+          "RmmVersion": {
             "type": "string",
-            "nullable": true
+            "description": "RMM agent version."
           },
-          "installerVersion": {
+          "InstallerVersion": {
             "type": "string",
-            "nullable": true
+            "description": "Installer version."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An agent (managed device) asset. Timestamps are UTC."
+      },
+      "public-cluster_PublicDeviceResponseBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
       },
-      "public-cluster_PublicDeviceResponsePagedResponse": {
+      "public-cluster_PublicDeviceResponseListBaseResponse": {
         "type": "object",
         "properties": {
-          "data": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/public-cluster_PublicDeviceResponse"
             },
             "nullable": true
           },
-          "totalCount": {
-            "type": "integer",
-            "format": "int32"
+          "DataContext": {
+            "$ref": "#/components/schemas/public-cluster_PaginationDataContext"
           },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "previousCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "hasPrevious": {
-            "type": "boolean"
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -1769,30 +3374,65 @@
       "public-cluster_PublicGroupModel": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Group identifier.",
             "format": "int64"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Group display name."
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time"
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "alias": {
+          "Alias": {
             "type": "string",
+            "description": "Group alias."
+          },
+          "OutboundEmail": {
+            "type": "string",
+            "description": "Configured outbound (from) email address for the group."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A technician group in the service provider organization. Timestamps are UTC."
+      },
+      "public-cluster_PublicGroupModelListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicGroupModel"
+            },
             "nullable": true
           },
-          "outboundEmail": {
-            "type": "string",
-            "nullable": true
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -1800,80 +3440,123 @@
       "public-cluster_PublicLastUpdateModel": {
         "type": "object",
         "properties": {
-          "updateType": {
+          "UpdateType": {
             "type": "string",
-            "nullable": true
+            "description": "Type of the last update (e.g. comment, status change)."
           },
-          "summary": {
+          "Summary": {
             "type": "string",
-            "nullable": true
+            "description": "Short summary of the last update."
           },
-          "on": {
+          "On": {
             "type": "string",
+            "description": "Timestamp of the last update (UTC).",
             "format": "date-time",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Summary of the most recent update to a ticket."
       },
       "public-cluster_PublicSlaFirstResponseModel": {
         "type": "object",
         "properties": {
-          "minutes": {
+          "Minutes": {
             "type": "number",
+            "description": "First-response target/elapsed time in minutes.",
             "format": "double",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "First-response SLA details."
       },
       "public-cluster_PublicSlaModel": {
         "type": "object",
         "properties": {
-          "firstResponse": {
+          "FirstResponse": {
             "$ref": "#/components/schemas/public-cluster_PublicSlaFirstResponseModel"
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "SLA information for a ticket."
       },
       "public-cluster_PublicStatusListItemModel": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Status identifier.",
             "format": "int64"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Status display name."
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time"
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "baseStatusId": {
+          "BaseStatusId": {
             "type": "integer",
+            "description": "Identifier of the underlying base status this status maps to.",
             "format": "int64"
           },
-          "color": {
+          "Color": {
             "type": "string",
-            "nullable": true
+            "description": "Display color (hex)."
           },
-          "sortOrder": {
+          "SortOrder": {
             "type": "integer",
+            "description": "Ordering position among statuses.",
             "format": "int32"
           },
-          "description": {
+          "Description": {
             "type": "string",
+            "description": "Status description."
+          },
+          "AskForReason": {
+            "type": "boolean",
+            "description": "Whether transitioning to this status requires a reason."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A ticket status configured for the service provider. Timestamps are UTC."
+      },
+      "public-cluster_PublicStatusListItemModelListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicStatusListItemModel"
+            },
             "nullable": true
           },
-          "askForReason": {
-            "type": "boolean"
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -1881,30 +3564,66 @@
       "public-cluster_PublicTagListItemModel": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Tag identifier.",
             "format": "int64"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Tag display name."
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "description": {
+          "Description": {
             "type": "string",
-            "nullable": true
+            "description": "Tag description."
           },
-          "isAiTag": {
+          "IsAiTag": {
+            "type": "boolean",
+            "description": "Whether the tag is AI-generated."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A ticket tag configured for the service provider. Timestamps are UTC."
+      },
+      "public-cluster_PublicTagListItemModelListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
             "type": "boolean"
+          },
+          "Data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicTagListItemModel"
+            },
+            "nullable": true
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -1912,182 +3631,195 @@
       "public-cluster_PublicTicketListItemModel": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "string",
+            "description": "Ticket identifier.",
             "format": "uuid"
           },
-          "title": {
+          "Title": {
             "type": "string",
-            "nullable": true
+            "description": "Ticket title/subject."
           },
-          "number": {
+          "Number": {
             "type": "integer",
+            "description": "Sequential ticket number.",
             "format": "int64",
             "nullable": true
           },
-          "displayNumber": {
+          "DisplayNumber": {
             "type": "string",
-            "nullable": true
+            "description": "Human-readable ticket number, including any service-provider prefix."
           },
-          "clientId": {
+          "ClientId": {
             "type": "integer",
+            "description": "Identifier of the client the ticket belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "clientLocationId": {
+          "ClientLocationId": {
             "type": "integer",
+            "description": "Identifier of the client location the ticket belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "contactId": {
+          "ContactId": {
             "type": "integer",
+            "description": "Identifier of the primary contact.",
             "format": "int64",
             "nullable": true
           },
-          "ccContactIds": {
+          "CcContactIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
-            "nullable": true
+            "description": "Identifiers of additional (CC) contacts."
           },
-          "leadAssigneeId": {
+          "LeadAssigneeId": {
             "type": "integer",
+            "description": "Identifier of the lead assignee (technician).",
             "format": "int64",
             "nullable": true
           },
-          "assistingAssigneeIds": {
+          "AssistingAssigneeIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
-            "nullable": true
+            "description": "Identifiers of assisting assignees (technicians)."
           },
-          "watcherIds": {
+          "WatcherIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
-            "nullable": true
+            "description": "Identifiers of technicians watching the ticket."
           },
-          "groupIds": {
+          "GroupIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
-            "nullable": true
+            "description": "Identifiers of all technician groups the ticket is assigned to."
           },
-          "primaryGroupId": {
+          "PrimaryGroupId": {
             "type": "integer",
+            "description": "Identifier of the primary technician group.",
             "format": "int64",
             "nullable": true
           },
-          "status": {
+          "Status": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "statusUpdatedOn": {
+          "StatusUpdatedOn": {
             "type": "string",
+            "description": "Timestamp of the last status change (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "statusReason": {
+          "StatusReason": {
             "type": "string",
-            "nullable": true
+            "description": "Reason recorded for the current status, when applicable."
           },
-          "priority": {
+          "Priority": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "source": {
+          "Source": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "type": {
+          "Type": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "tagIds": {
+          "TagIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int64"
             },
-            "nullable": true
+            "description": "Identifiers of tags applied to the ticket."
           },
-          "isUnread": {
-            "type": "boolean"
+          "IsUnread": {
+            "type": "boolean",
+            "description": "Whether the ticket is currently unread."
           },
-          "isAwaitingClient": {
-            "type": "boolean"
+          "IsAwaitingClient": {
+            "type": "boolean",
+            "description": "Whether the ticket is awaiting a client response."
           },
-          "isMerged": {
-            "type": "boolean"
+          "IsMerged": {
+            "type": "boolean",
+            "description": "Whether the ticket has been merged into another ticket."
           },
-          "mergedIntoTicketId": {
+          "MergedIntoTicketId": {
             "type": "integer",
+            "description": "Identifier of the ticket this one was merged into, if any.",
             "format": "int64",
             "nullable": true
           },
-          "mergedTicketIds": {
+          "MergedTicketIds": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "uuid"
             },
-            "nullable": true
+            "description": "Identifiers of tickets merged into this one."
           },
-          "sla": {
+          "Sla": {
             "$ref": "#/components/schemas/public-cluster_PublicSlaModel"
           },
-          "lastUpdate": {
+          "LastUpdate": {
             "$ref": "#/components/schemas/public-cluster_PublicLastUpdateModel"
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Ticket creation timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Ticket last-updated timestamp (UTC). Default sort key for the list endpoint.",
             "format": "date-time",
             "nullable": true
           },
-          "closedOn": {
+          "ClosedOn": {
             "type": "string",
+            "description": "Ticket closed timestamp (UTC), if closed.",
             "format": "date-time",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "A ticket as returned by the ticket list endpoint. All timestamps are UTC."
       },
-      "public-cluster_PublicTicketListItemModelPagedResponse": {
+      "public-cluster_PublicTicketListItemModelListBaseResponse": {
         "type": "object",
         "properties": {
-          "data": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/public-cluster_PublicTicketListItemModel"
             },
             "nullable": true
           },
-          "totalCount": {
-            "type": "integer",
-            "format": "int32"
+          "DataContext": {
+            "$ref": "#/components/schemas/public-cluster_PaginationDataContext"
           },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "previousCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "hasPrevious": {
-            "type": "boolean"
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -2106,30 +3838,66 @@
       "public-cluster_PublicTypeListItemModel": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "Type identifier.",
             "format": "int64"
           },
-          "name": {
+          "Name": {
             "type": "string",
-            "nullable": true
+            "description": "Type display name."
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "description": {
+          "Description": {
             "type": "string",
-            "nullable": true
+            "description": "Type description."
           },
-          "isAiType": {
+          "IsAiType": {
+            "type": "boolean",
+            "description": "Whether the type is AI-generated."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A ticket type configured for the service provider. Timestamps are UTC."
+      },
+      "public-cluster_PublicTypeListItemModelListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
             "type": "boolean"
+          },
+          "Data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicTypeListItemModel"
+            },
+            "nullable": true
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -2137,68 +3905,69 @@
       "public-cluster_PublicUserModel": {
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
+            "description": "User identifier.",
             "format": "int64"
           },
-          "firstName": {
+          "FirstName": {
             "type": "string",
-            "nullable": true
+            "description": "User first name."
           },
-          "lastName": {
+          "LastName": {
             "type": "string",
-            "nullable": true
+            "description": "User last name."
           },
-          "status": {
+          "Status": {
             "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
           },
-          "createdOn": {
+          "CreatedOn": {
             "type": "string",
+            "description": "Creation timestamp (UTC).",
             "format": "date-time"
           },
-          "updatedOn": {
+          "UpdatedOn": {
             "type": "string",
+            "description": "Last-updated timestamp (UTC).",
             "format": "date-time",
             "nullable": true
           },
-          "email": {
+          "Email": {
             "type": "string",
-            "nullable": true
+            "description": "User email address."
           },
-          "timeZone": {
+          "TimeZone": {
             "type": "string",
-            "nullable": true
+            "description": "IANA time zone identifier for the user."
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "A user (technician) in the service provider organization. Timestamps are UTC."
       },
-      "public-cluster_PublicUserModelPagedResponse": {
+      "public-cluster_PublicUserModelListBaseResponse": {
         "type": "object",
         "properties": {
-          "data": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/public-cluster_PublicUserModel"
             },
             "nullable": true
           },
-          "totalCount": {
-            "type": "integer",
-            "format": "int32"
+          "DataContext": {
+            "$ref": "#/components/schemas/public-cluster_PaginationDataContext"
           },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "previousCursor": {
-            "type": "string",
-            "nullable": true
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "hasPrevious": {
-            "type": "boolean"
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
           }
         },
         "additionalProperties": false
@@ -2216,101 +3985,130 @@
         "format": "int32"
       },
       "public-cluster_UpdatePublicClientCommand": {
+        "required": [
+          "Id"
+        ],
         "type": "object",
         "properties": {
-          "id": {
+          "Id": {
             "type": "integer",
-            "format": "int64"
+            "description": "Identifier of the client to update. Required.",
+            "format": "int64",
+            "example": 5001
           },
-          "name": {
+          "Name": {
             "type": "string",
+            "description": "New client display name. Leave null to keep the current value.",
             "nullable": true
           },
-          "statusId": {
+          "StatusId": {
             "type": "integer",
+            "description": "New status identifier. Leave null to keep the current value.",
             "format": "int32",
             "nullable": true
           },
-          "billingName": {
+          "BillingName": {
             "type": "string",
+            "description": "New billing name. Leave null to keep the current value.",
             "nullable": true
           },
-          "alternateName": {
+          "AlternateName": {
             "type": "string",
+            "description": "New alternate / trading name. Leave null to keep the current value.",
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Request body for updating a client. Only the supplied (non-null) fields are changed;\r\nGorelo_PublicAPI.CRM.Commands.UpdatePublicClient.UpdatePublicClientCommand.Id identifies the client to update."
       },
       "public-cluster_UpdatePublicContactCommand": {
+        "required": [
+          "ClientId",
+          "ContactId",
+          "FirstName",
+          "LastName",
+          "PrimaryEmail"
+        ],
         "type": "object",
         "properties": {
-          "contactId": {
+          "ContactId": {
             "type": "integer",
+            "description": "Identifier of the contact to update. Required.",
+            "format": "int64",
+            "example": 7001
+          },
+          "FirstName": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Contact first name. Required.",
+            "example": "Jane"
+          },
+          "LastName": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Contact last name. Required.",
+            "example": "Doe"
+          },
+          "ClientId": {
+            "type": "integer",
+            "description": "Identifier of the client the contact belongs to. Required.",
             "format": "int64"
           },
-          "firstName": {
-            "type": "string",
-            "nullable": true
-          },
-          "lastName": {
-            "type": "string",
-            "nullable": true
-          },
-          "clientId": {
+          "ClientLocationId": {
             "type": "integer",
-            "format": "int64"
-          },
-          "clientLocationId": {
-            "type": "integer",
+            "description": "Identifier of the client location the contact belongs to.",
             "format": "int64",
             "nullable": true
           },
-          "primaryEmail": {
+          "PrimaryEmail": {
+            "minLength": 1,
             "type": "string",
-            "nullable": true
+            "description": "Primary email address. Required.",
+            "example": "jane.doe@contoso.com"
           },
-          "secondaryEmail": {
+          "SecondaryEmail": {
             "type": "array",
             "items": {
               "type": "string"
             },
+            "description": "Additional (secondary) email addresses.",
             "nullable": true
           },
-          "mobilePhone": {
+          "MobilePhone": {
             "type": "string",
-            "nullable": true
+            "description": "Mobile phone number (without country code)."
           },
-          "mobilePhoneCountryCode": {
+          "MobilePhoneCountryCode": {
             "type": "string",
-            "nullable": true
+            "description": "Mobile phone country calling code (e.g. +1)."
           },
-          "officePhone": {
+          "OfficePhone": {
             "type": "string",
-            "nullable": true
+            "description": "Office phone number (without country code)."
           },
-          "officePhoneCountryCode": {
+          "OfficePhoneCountryCode": {
             "type": "string",
-            "nullable": true
+            "description": "Office phone country calling code (e.g. +1)."
           },
-          "jobTitle": {
+          "JobTitle": {
             "type": "string",
-            "nullable": true
+            "description": "Contact job title."
           },
-          "department": {
+          "Department": {
             "type": "string",
-            "nullable": true
+            "description": "Contact department."
           },
-          "timeZone": {
+          "TimeZone": {
             "type": "string",
-            "nullable": true
+            "description": "IANA time zone identifier for the contact (e.g. America/New_York)."
           },
-          "description": {
+          "Description": {
             "type": "string",
-            "nullable": true
+            "description": "Free-text description / notes for the contact."
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Request body for updating an existing contact. Gorelo_PublicAPI.CRM.Commands.UpdatePublicContact.UpdatePublicContactCommand.ContactId identifies the contact."
       }
     },
     "securitySchemes": {
