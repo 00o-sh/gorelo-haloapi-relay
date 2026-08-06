@@ -10,6 +10,7 @@
     "dev:lan": "wrangler dev --ip 0.0.0.0",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
+    "check:allowscripts": "node scripts/check-allowscripts.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate:local": "wrangler d1 migrations apply tier2tickets-relay --local",

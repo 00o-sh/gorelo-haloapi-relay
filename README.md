@@ -183,6 +183,21 @@ curl -i localhost:8787/health         # 200 ok
 Local DB helpers: `npm run db:migrate:local`, `npm run db:seed:local`, and
 `npm run db:reset:local` (wipes the local D1 and re-seeds).
 
+### npm v12 install scripts (`allowScripts`)
+
+npm v12 blocks dependency install scripts by default. `workerd` (wrangler dev's
+runtime) and `esbuild` (the bundler) need theirs, so they're allowlisted in
+`package.json` → `allowScripts`. That field is keyed by exact `name@version`, so a
+Renovate bump to either would invalidate it — two things keep it honest:
+
+- **CI guard** (`npm run check:allowscripts`) fails the build if `allowScripts` drifts
+  from the locked versions, printing the one-line fix.
+- **Renovate** re-runs `npm approve-scripts` after updates (`postUpgradeTasks` in
+  `renovate.json`) to refresh the field automatically. This requires post-upgrade
+  commands to be **enabled/allowlisted in your Renovate (Mend) settings** (allow
+  `npm approve-scripts`); until then the CI guard is the backstop and the manual fix is
+  `npm approve-scripts workerd esbuild` (commit `package.json`).
+
 ## Helpdesk Buttons portal setup
 
 Configure Tier2 as a **HaloPSA — Cloud Hosted** integration:
