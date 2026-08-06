@@ -1,0 +1,45 @@
+{
+  "name": "gorelo-haloapi-relay",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    // Node pinned to match CI (.github/workflows/ci.yml -> setup-node 26.5.1) so
+    // "works locally" == "works in CI". Installed via nvm by the feature.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "26.5.1"
+    }
+  },
+  // Publish the container's 8787 to the HOST on 0.0.0.0 (Docker `-p 8787:8787`), so
+  // OTHER devices on the LAN can reach it at http://<host-LAN-IP>:8787. This is a real
+  // Docker port publish (unlike `forwardPorts`, which only binds the host's localhost).
+  // NOTE: run the Worker with `npm run dev:lan` so wrangler listens on 0.0.0.0 inside
+  // the container — a localhost bind won't receive the published traffic. (appPort is
+  // a local-Docker feature; in Codespaces use port visibility "public" instead.)
+  "appPort": ["8787:8787"],
+  "forwardPorts": [8787],
+  "portsAttributes": {
+    "8787": {
+      "label": "wrangler dev (Worker)",
+      "onAutoForward": "notify"
+    }
+  },
+  // Install deps. npm v12 blocks dependency install scripts by default — the ones we
+  // need (`workerd` = wrangler dev's runtime, `esbuild` = the bundler) are allowlisted
+  // in package.json `allowScripts`, which is the supported mechanism for project-scoped
+  // installs (the `--allow-scripts` CLI flag is rejected here; global installs only).
+  "postCreateCommand": "npm ci",
+  "customizations": {
+    "vscode": {
+      // Make VS Code's own port forwarding bind to all interfaces (LAN-reachable)
+      // too, not just the host's localhost — belt-and-suspenders alongside appPort.
+      "settings": {
+        "remote.localPortHost": "allInterfaces"
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "vitest.explorer",
+        "tamasfe.even-better-toml"
+      ]
+    }
+  }
+}

@@ -54,8 +54,9 @@ Cron (every 6h) / POST /admin/sync / first-call bootstrap ──▶ syncAll() de
 
 | Path | Purpose |
 |---|---|
-| `src/index.ts` | `fetch` + `scheduled` handlers, routing (admin/health/Halo) |
+| `src/index.ts` | `fetch` + `scheduled` handlers, routing (admin/health/alerts/Halo) |
 | `src/halo.ts` | the HaloPSA mock — token, lookups, per-product create, report parsing |
+| `src/alerts.ts` | monitoring-alert ingress (`POST /v1/alerts`) — auth, dedup by `dedupe_key`, Gorelo mapping |
 | `src/products.ts` | product registry (`PRODUCTS`, IPs/CIDRs, `ENABLE_*`, UA gate, per-product OAuth creds, `matchProduct`, `haloCredentials`, `ipAllowed`) |
 | `src/haloShapes.ts` | full Halo config-item shapes (status/type/priority/team), field lists derived from the swagger |
 | `src/gorelo.ts` | Gorelo API client (retry/backoff, defensive parsing) |
@@ -97,6 +98,7 @@ GORELO_API_KEY=xxxx ./scripts/gorelo-ids.sh
 # 4. Set secrets (never committed)
 wrangler secret put GORELO_API_KEY     # X-API-Key for Gorelo (ticket write + asset/contact/client read)
 wrangler secret put ADMIN_KEY          # gates POST /admin/sync
+wrangler secret put ALERT_SHARED_SECRET # optional: gates POST /v1/alerts (Bearer / X-Alert-Key)
 # Per-product Halo mock OAuth secrets (issue #51) — one client_secret per product,
 # paired with its (non-secret) client_id var. Easiest: ./scripts/halo-cred.sh <product>
 # (Windows: ./scripts/halo-cred.ps1 <product>)
@@ -111,7 +113,92 @@ curl -X POST https://<your-worker-host>/admin/sync -H "X-Admin-Key: <ADMIN_KEY>"
 ```
 
 For local development, copy `.dev.vars.example` to `.dev.vars` (git-ignored) and
-run `wrangler dev`.
+run `wrangler dev`. See the workflow below.
+
+## Local development
+
+Develop and test **without deploying to prod**. `wrangler dev` runs the Worker on
+Miniflare with a **local D1** (a SQLite file under `.wrangler/state`, keyed by the D1
+binding — the `database_id` in `wrangler.toml` is only used for `--remote`/`deploy`, so
+local state is fully isolated from prod) and local queues/crons. The vitest suite
+(`npm test`) likewise runs against an isolated in-memory D1 — neither touches prod.
+
+Outbound calls to **Gorelo are real**: point `GORELO_BASE_URL` / `GORELO_API_KEY` in
+`.dev.vars` at whatever tenant you want to exercise. That means a `triggered` alert
+against the local Worker posts a **real** Gorelo alert (and a Halo press files a **real**
+ticket) — use an obvious `TEST —` title, or exercise no-write paths (an alert
+`heartbeat`, or the health endpoints) when you don't want side effects.
+
+### Dev container
+
+`.devcontainer/` pins Node to match CI and installs deps on create — open the repo in a
+[dev container](https://containers.dev) (VS Code "Reopen in Container", GitHub Codespaces,
+or Claude Code on the web) and you get a ready toolchain with port `8787` published.
+
+### Reaching the local Worker from other devices on the network
+
+To let another device on your LAN (e.g. a test SQL/monitoring host) hit the local
+Worker, two things must line up:
+
+1. **wrangler must listen on all interfaces** inside the container, not just
+   `localhost`: use `npm run dev:lan` (`wrangler dev --ip 0.0.0.0`).
+2. **the port must be published to the host on `0.0.0.0`.** The dev container does this
+   via `appPort` (a real Docker `-p 8787:8787` publish) plus VS Code's
+   `remote.localPortHost: allInterfaces`. Outside the container, `wrangler dev --ip
+   0.0.0.0` already binds the host directly.
+
+Then other devices reach it at **`http://<host-LAN-IP>:8787`** (find `<host-LAN-IP>` with
+`ipconfig` / `ip addr`). Also allow inbound `8787` through the host firewall.
+
+- **Codespaces / cloud dev containers** have no LAN — instead set the forwarded port's
+  visibility to **public** and share the generated `*.app.github.dev` URL.
+- **IP allowlist caveat:** the Halo/alerts IP allowlist keys off Cloudflare's
+  `CF-Connecting-IP` header, which is **not present** in local `wrangler dev`. For LAN
+  testing either set `ENFORCE_IP_ALLOWLIST="false"` in `.dev.vars` (rely on the shared
+  secret / bearer token instead), or have the client send a `CF-Connecting-IP` header
+  matching the allowlist.
+- **Security:** this exposes a local Worker holding **real Gorelo creds** to your LAN —
+  keep it to trusted networks, and remember ticket-creating requests file real tickets.
+
+### First run
+
+```bash
+cp .dev.vars.example .dev.vars     # then fill in a real GORELO_API_KEY (+ ADMIN_KEY, etc.)
+npm ci                             # (skipped if the dev container already ran it)
+npm run dev:setup                  # apply migrations + seed synthetic data into local D1
+npm run dev                        # wrangler dev -> http://localhost:8787
+```
+
+`dev:setup` runs `db:migrate:local` then `db:seed:local`. The seed
+(`scripts/seed-dev.sql`) is **synthetic** — never seed real mirror data (names/emails/
+hosts are PHI) into a dev DB. It also stamps `last_sync` so the Worker won't lazily pull
+the real Gorelo mirror into your local D1. If you *do* want a real mirror locally, run
+`curl -X POST localhost:8787/admin/sync -H "X-Admin-Key: <ADMIN_KEY>"` (pulls real Gorelo
+data — PHI — into the local DB).
+
+### Smoke test
+
+```bash
+curl -i localhost:8787/health         # 200 ok
+```
+
+Local DB helpers: `npm run db:migrate:local`, `npm run db:seed:local`, and
+`npm run db:reset:local` (wipes the local D1 and re-seeds).
+
+### npm v12 install scripts (`allowScripts`)
+
+npm v12 blocks dependency install scripts by default. `workerd` (wrangler dev's
+runtime) and `esbuild` (the bundler) need theirs, so they're allowlisted in
+`package.json` → `allowScripts`. That field is keyed by exact `name@version`, so a
+Renovate bump to either would invalidate it — two things keep it honest:
+
+- **CI guard** (`npm run check:allowscripts`) fails the build if `allowScripts` drifts
+  from the locked versions, printing the one-line fix.
+- **Renovate** re-runs `npm approve-scripts` after updates (`postUpgradeTasks` in
+  `renovate.json`) to refresh the field automatically. This requires post-upgrade
+  commands to be **enabled/allowlisted in your Renovate (Mend) settings** (allow
+  `npm approve-scripts`); until then the CI guard is the backstop and the manual fix is
+  `npm approve-scripts workerd esbuild` (commit `package.json`).
 
 ## Helpdesk Buttons portal setup
 
@@ -138,6 +225,8 @@ Configure Tier2 as a **HaloPSA — Cloud Hosted** integration:
 | `POST /admin/sync` | `X-Admin-Key` / `X-API-Key` / `Authorization: Bearer` = `<ADMIN_KEY>` | Refresh the D1 mirror on demand (fans location fetches out to the queue) |
 | `GET /admin/status` | `ADMIN_KEY` (same as `/admin/sync`) | Pretty JSON: mirror row counts, `lastSync`, and `locationQueue` (`queued` / `drained` / `lagSeconds`) — follow the location fan-out |
 | `POST /admin/test-webhook` | `ADMIN_KEY` (same as `/admin/sync`) | Fire a test alert through the dead-letter webhook and report its HTTP status |
+| `POST /v1/alerts` | **per-source** two-factor: the source's own secret (`Authorization: Bearer` / `X-Alert-Key`) **bound to** that source's own IP allowlist (see [Monitoring alerts](#monitoring-alerts)) | Monitoring-alert ingress — create/update/resolve a Gorelo alert, deduplicated by `dedupe_key` |
+| `GET`/`HEAD` `/v1/alerts/health` | none | Alert-proxy liveness descriptor (`{"status":"ok","service":"Gorelo alert proxy"}`) — no secrets |
 | `GET`/`HEAD` `/health` | none | Liveness check (accepts `HEAD` for uptime monitors) |
 
 A recognized path hit with the wrong method returns `405` with an `Allow` header
@@ -278,6 +367,197 @@ endpoint, so linking is the only way to reach that content from a ticket.
 resolved ids in the `HALO routing:` line). Set `DEBUG_LOGS=true` to log full
 `HALO CAPTURE` / `HALO RESPONSE` bodies (which contain PII/PHI — names, emails,
 phones) for a short debugging window, then turn it back off.
+
+## Monitoring alerts
+
+`POST /v1/alerts` (`src/alerts.ts`) is a standardized HTTPS ingress for monitoring
+sources — an on-prem Windows/SQL Server, a scheduled job, any script — to raise,
+update, and resolve alerts in Gorelo through this IP-allowlisted proxy. It is
+**independent of the HaloPSA mock**: its own per-source credentials, its own JSON
+contract. It is deliberately generic — **the sender owns all identifiers** (`source`,
+`host`, `customer`, `monitor_id`, `dedupe_key`, `title`, `details`, …); the Worker
+validates and routes but never hard-codes any monitor, host, or customer. The values
+shown below are illustrative placeholders, not an enforced list.
+
+### Authentication — per-source secret bound to IP
+
+Like each Halo product, an alert **source** (a customer) is two-factor: it has its own
+shared secret **bound to** its own IP allowlist. A request must both present the
+source's secret (`Authorization: Bearer <secret>`, preferred, or `X-Alert-Key: <secret>`)
+**and** originate from an IP in that source's list. So:
+
+- wrong/unknown secret → **`401`** (regardless of IP)
+- a valid secret presented from an IP outside *its* source's list → **`403`**
+
+One customer's secret is therefore useless from another customer's network. The
+presented secret **identifies** the source (matched constant-time across all sources),
+then that source's IP allowlist is enforced.
+
+Sources are env-configured, so onboarding a customer needs **no code change**:
+`ALERT_SOURCES` is a comma/space-separated list of source keys (unset ⇒ just the
+built-in `default`). Per key the credential pair resolves by name:
+
+| Source key | Secret var | IP-allowlist var |
+|---|---|---|
+| `default` | `ALERT_SHARED_SECRET` | `ALERT_ALLOWED_IPS` |
+| `<key>` (e.g. `acme`) | `ALERT_SECRET_<KEY>` (e.g. `ALERT_SECRET_ACME`) | `ALERT_IPS_<KEY>` (e.g. `ALERT_IPS_ACME`) |
+
+(`<KEY>` = the key upper-cased with non-alphanumerics → `_`.) A source whose secret is
+unset is skipped, so it can never authenticate. IP enforcement follows the shared
+`ENFORCE_IP_ALLOWLIST` flag. To add customer `acme`: append `acme` to `ALERT_SOURCES`,
+set `ALERT_IPS_ACME` in `[vars]`, and `wrangler secret put ALERT_SECRET_ACME`.
+
+Each source's IP-allowlist var holds a **list** — any mix of exact IPs and IPv4 CIDR
+ranges/subnets, comma/space/newline separated (same format and `ipInCidr` matcher as
+the product allowlists), e.g. `ALERT_IPS_ACME = "203.0.113.7, 198.51.100.0/24, 192.0.2.0/28"`.
+
+### Request
+
+`Content-Type: application/json`. Required fields: `source`, `host`, `monitor_id`,
+`dedupe_key`, `status`, `severity`, `title`, `message`, `timestamp`. Optional:
+`customer`, `event_id`, `details` (an arbitrary object, rendered into the ticket).
+
+```jsonc
+{
+  "source": "SQL Backup Monitor",
+  "host": "DB-SERVER-01",
+  "customer": "Example Customer",
+  "monitor_id": "daily-restore",
+  "event_id": "2026-08-05-daily-restore",
+  "dedupe_key": "DB-SERVER-01:daily-restore",
+  "status": "triggered",              // triggered | resolved | heartbeat
+  "severity": "critical",             // info | warning | critical
+  "title": "Daily restore failed",
+  "message": "The daily transaction-log restore failed after all retry attempts.",
+  "timestamp": "2026-08-05T01:30:00-05:00",
+  "details": { "database": "app_db", "error": "No new transaction-log backup was available." }
+}
+```
+
+`monitor_id` is an opaque, sender-defined string — the Worker accepts any value and
+never validates it against a list. A SQL-server monitor might send e.g.
+`daily-restore`, `restore-stale`, `database-state`, `sql-service`, `disk-space-e`,
+`etl-failure`, or `heartbeat`, but any naming scheme works.
+
+### Behavior (deduplication)
+
+`dedupe_key` is the stable identity for an alert; the Worker tracks its lifecycle in
+the `alerts` D1 table so a retrying monitor never re-raises the same alert.
+
+| `status` | Existing state | Action | Gorelo effect |
+|---|---|---|---|
+| `triggered` | none / previously resolved | `created` | posts **one** Gorelo alert (`POST /v1/alerts/`) |
+| `triggered` | open, new event | `updated` | updates the stored alert — **no** re-post |
+| `triggered` | open, same `Idempotency-Key`/`event_id` | `duplicate-ignored` | nothing |
+| `resolved` | open | `resolved` | posts a `Resolved: …` Gorelo alert, marks the stored alert resolved |
+| `resolved` | none / already resolved | `duplicate-ignored` | nothing (success, no post) |
+| `heartbeat` | — | `heartbeat-recorded` | stamps `last_seen` in `alert_heartbeats`, **no** post |
+
+### Response
+
+`202 Accepted` (a `200` is equally valid — Gorelo confirms synchronously here):
+
+```json
+{ "accepted": true, "action": "created", "dedupe_key": "DB-SERVER-01:daily-restore" }
+```
+
+`action` ∈ `created | updated | resolved | heartbeat-recorded | duplicate-ignored`.
+(No `remote_id`: Gorelo's alert endpoint returns a boolean success with no alert id — see
+the mapping below.) Errors return `{ "accepted": false, "error": "…" }` with: `400`
+invalid JSON / missing or bad field · `401` invalid shared secret · `403` source IP not
+allowed · `405` method other than `POST` · `502` Gorelo rejected/unavailable · `500`
+unexpected. (`429` is reserved in the contract for rate limiting; the Worker does not
+currently throttle.)
+
+### Retry & idempotency
+
+The monitoring script should retry on `429/500/502/503/504`. Retries are safe:
+`dedupe_key` collapses repeats to `updated`/`duplicate-ignored`, and an optional
+`Idempotency-Key: <unique-event-id>` header (falling back to `event_id`) makes an exact
+replay of the **same** event a no-op `duplicate-ignored` rather than an update. A `502`
+leaves the alert **unstored/open**, so a retry re-attempts the Gorelo write cleanly.
+
+### Gorelo mapping
+
+Events map to Gorelo's **native alert** endpoint — `POST /v1/alerts/` (`PostAlertRequest`,
+*"Posts an external alert against a client"*) — **not** a service ticket:
+
+| Alert field | Gorelo alert field (`PostAlertRequest`) |
+|---|---|
+| `title` | `Name` |
+| `host` | `Resource` (the host/service the alert is raised for) |
+| `severity` | `Severity` (`AlertLevel` int 1–4) — `info`→`ALERT_LEVEL_INFO`\|1, `warning`→`ALERT_LEVEL_WARNING`\|2, `critical`→`ALERT_LEVEL_CRITICAL`\|3. **TODO(verify)** which int is which in the Gorelo UI (unlabeled enum) |
+| `message` + `details` + metadata (monitor/source/customer/timestamp/`dedupe_key`) | `Description` (plain text) |
+| `customer` / `host` | `ClientId` — `ALERT_CLIENT_ID`, else `customer` matched by exact name against the client mirror, else a mirrored device matched by `host`, else `CATCHALL_CLIENT_ID` |
+
+**Does Gorelo resolve/dedupe by a stored remote id or key?** No. Gorelo **does** have a
+native alert endpoint (`POST /v1/alerts/`), but it is **create-only** — the response is a
+boolean success envelope with **no alert id**, and there is no update/close/GET for
+alerts. So Gorelo offers no server-side dedup key and no way to clear an alert by id.
+Deduplication and the open→resolved lifecycle are therefore owned by **this Worker**: the
+`dedupe_key` state lives in D1; a repeat `triggered` updates that row without re-posting;
+and a `resolved` event posts a fresh `Resolved: …` alert to signal the clear (there is
+nothing to send back to Gorelo to close the original).
+
+### Configuration
+
+Per-source credentials (see [Authentication](#authentication--per-source-secret-bound-to-ip)):
+`ALERT_SOURCES`, and per key the `ALERT_ALLOWED_IPS`/`ALERT_SHARED_SECRET` (default) or
+`ALERT_IPS_<KEY>`/`ALERT_SECRET_<KEY>` pair. Other non-secret vars (`[vars]`): optional
+routing overrides `ALERT_CLIENT_ID`, `ALERT_TAG_ID`, `ALERT_PRIORITY_CRITICAL|WARNING|INFO`.
+Secrets:
+
+```bash
+wrangler secret put ALERT_SHARED_SECRET   # default source (Bearer / X-Alert-Key value)
+wrangler secret put ALERT_SECRET_ACME     # per-customer source secret (one per ALERT_SOURCES key)
+```
+
+Logged per alert (never the secret): event `timestamp`, source IP, authenticated source
+key, `host`, `monitor_id`, `dedupe_key`, `status`, `severity`, action, Gorelo status, and
+remote id.
+
+### Examples
+
+Raise (trigger) an alert:
+
+```bash
+curl -sS -X POST https://<worker-host>/v1/alerts \
+  -H "Authorization: Bearer $ALERT_SHARED_SECRET" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 2026-08-05-daily-restore" \
+  -d '{
+    "source": "SQL Backup Monitor",
+    "host": "DB-SERVER-01",
+    "customer": "Example Customer",
+    "monitor_id": "daily-restore",
+    "dedupe_key": "DB-SERVER-01:daily-restore",
+    "status": "triggered",
+    "severity": "critical",
+    "title": "Daily restore failed",
+    "message": "The daily transaction-log restore failed after all retry attempts.",
+    "timestamp": "2026-08-05T01:30:00-05:00",
+    "details": { "database": "app_db", "database_state": "ONLINE" }
+  }'
+```
+
+Resolve it (same `dedupe_key`):
+
+```bash
+curl -sS -X POST https://<worker-host>/v1/alerts \
+  -H "X-Alert-Key: $ALERT_SHARED_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "SQL Backup Monitor",
+    "host": "DB-SERVER-01",
+    "monitor_id": "daily-restore",
+    "dedupe_key": "DB-SERVER-01:daily-restore",
+    "status": "resolved",
+    "severity": "info",
+    "title": "Daily restore recovered",
+    "message": "A transaction-log restore succeeded; the alert is cleared.",
+    "timestamp": "2026-08-05T02:05:00-05:00"
+  }'
+```
 
 ## Products
 
