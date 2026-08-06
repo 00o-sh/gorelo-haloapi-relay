@@ -111,7 +111,52 @@ curl -X POST https://<your-worker-host>/admin/sync -H "X-Admin-Key: <ADMIN_KEY>"
 ```
 
 For local development, copy `.dev.vars.example` to `.dev.vars` (git-ignored) and
-run `wrangler dev`.
+run `wrangler dev`. See the workflow below.
+
+## Local development
+
+Develop and test **without deploying to prod**. `wrangler dev` runs the Worker on
+Miniflare with a **local D1** (a SQLite file under `.wrangler/state`, keyed by the D1
+binding — the `database_id` in `wrangler.toml` is only used for `--remote`/`deploy`, so
+local state is fully isolated from prod) and local queues/crons. The vitest suite
+(`npm test`) likewise runs against an isolated in-memory D1 — neither touches prod.
+
+Outbound calls to **Gorelo are real**: point `GORELO_BASE_URL` / `GORELO_API_KEY` in
+`.dev.vars` at whatever tenant you want to exercise. That means a `triggered`/ticket-
+creating request against the local Worker files a **real** Gorelo ticket — use an
+obvious `TEST —` title, or exercise no-write paths (e.g. an alert `heartbeat`, or the
+health endpoints) when you don't want side effects.
+
+### Dev container
+
+`.devcontainer/` pins Node to match CI and installs deps on create — open the repo in a
+[dev container](https://containers.dev) (VS Code "Reopen in Container", GitHub Codespaces,
+or Claude Code on the web) and you get a ready toolchain with port `8787` forwarded.
+
+### First run
+
+```bash
+cp .dev.vars.example .dev.vars     # then fill in a real GORELO_API_KEY (+ ADMIN_KEY, etc.)
+npm ci                             # (skipped if the dev container already ran it)
+npm run dev:setup                  # apply migrations + seed synthetic data into local D1
+npm run dev                        # wrangler dev -> http://localhost:8787
+```
+
+`dev:setup` runs `db:migrate:local` then `db:seed:local`. The seed
+(`scripts/seed-dev.sql`) is **synthetic** — never seed real mirror data (names/emails/
+hosts are PHI) into a dev DB. It also stamps `last_sync` so the Worker won't lazily pull
+the real Gorelo mirror into your local D1. If you *do* want a real mirror locally, run
+`curl -X POST localhost:8787/admin/sync -H "X-Admin-Key: <ADMIN_KEY>"` (pulls real Gorelo
+data — PHI — into the local DB).
+
+### Smoke test
+
+```bash
+curl -i localhost:8787/health         # 200 ok
+```
+
+Local DB helpers: `npm run db:migrate:local`, `npm run db:seed:local`, and
+`npm run db:reset:local` (wipes the local D1 and re-seeds).
 
 ## Helpdesk Buttons portal setup
 

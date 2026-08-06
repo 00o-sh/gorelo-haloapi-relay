@@ -1,0 +1,32 @@
+{
+  "name": "gorelo-haloapi-relay",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    // Node pinned to match CI (.github/workflows/ci.yml -> setup-node 26.5.1) so
+    // "works locally" == "works in CI". Installed via nvm by the feature.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "26.5.1"
+    }
+  },
+  // `wrangler dev` serves the Worker here; forward it so the host browser/curl can reach it.
+  "forwardPorts": [8787],
+  "portsAttributes": {
+    "8787": {
+      "label": "wrangler dev (Worker)",
+      "onAutoForward": "notify"
+    }
+  },
+  // Install deps on create. DB setup + `wrangler dev` are left to the developer
+  // (they need a .dev.vars first) — see README "Local development".
+  "postCreateCommand": "npm ci",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "vitest.explorer",
+        "tamasfe.even-better-toml"
+      ]
+    }
+  }
+}
