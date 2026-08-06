@@ -16,13 +16,132 @@ export class GoreloError extends Error {
     message: string,
     readonly status: number,
     readonly body: string,
+    /**
+     * The stable 6-digit failure code (MMTTNN) parsed from the response envelope's
+     * `Notifications[]` when present. Since 2026-08 every failure carries one — it
+     * is the language-independent identifier to branch/alert on (message text is
+     * not). Non-PII, so it is safe to surface in a breadcrumb. `null` when the body
+     * carried no envelope/code (e.g. a raw 5xx/proxy error).
+     */
+    readonly code: string | null = null,
   ) {
     super(message);
     this.name = "GoreloError";
   }
+
+  /** Build from a raw error body, parsing the first `Notifications[].Code` off it. */
+  static fromBody(message: string, status: number, body: string): GoreloError {
+    return new GoreloError(message, status, body, firstNotificationCode(body));
+  }
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+// --- 2026-08 wire-format bridge -------------------------------------------------
+// The Gorelo public API now (a) wraps every response in a standard envelope
+// `{ StatusCode, IsSuccess, Data, DataContext, Notifications }`, (b) uses PascalCase
+// field names throughout, (c) carries cursor-paging metadata under
+// `DataContext.Pagination` (cursors are signed/opaque), and (d) REJECTS request
+// bodies with unknown/misspelled fields (400). The relay models everything in
+// camelCase, so we camelize responses on the way in and pascalize the create body
+// on the way out — a single seam here keeps the rest of the codebase unchanged.
+
+/** Lower-case the first character of a key (PascalCase -> camelCase; camelCase unchanged). */
+function camelKey(k: string): string {
+  return k.length > 0 ? k[0]!.toLowerCase() + k.slice(1) : k;
+}
+
+/** Upper-case the first character of a key (camelCase -> PascalCase). */
+function pascalKey(k: string): string {
+  return k.length > 0 ? k[0]!.toUpperCase() + k.slice(1) : k;
+}
+
+/**
+ * Recursively rewrite object keys with `fn`, walking arrays and nested objects.
+ * Values (and non-objects) pass through untouched. First-char case flips round-trip
+ * cleanly for every field the relay reads/writes (e.g. `LocalIPAddress` <->
+ * `localIPAddress`, `SendTicketCreatedEmail` <-> `sendTicketCreatedEmail`).
+ */
+function rekey(v: unknown, fn: (k: string) => string): unknown {
+  if (Array.isArray(v)) return v.map((x) => rekey(x, fn));
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[fn(k)] = rekey(val, fn);
+    return out;
+  }
+  return v;
+}
+
+/** Gorelo now rejects pageSize outside 1–200 with a 400 (was silently clamped). Clamp here. */
+export function clampPageSize(n: number): number {
+  if (!Number.isFinite(n)) return 50;
+  return Math.min(200, Math.max(1, Math.floor(n)));
+}
+
+/** Paging metadata, camelized from `DataContext.Pagination`. */
+interface Pagination {
+  nextCursor?: string | null;
+  previousCursor?: string | null;
+  hasMore?: boolean;
+  hasPrevious?: boolean;
+  totalCount?: number;
+}
+
+/** A parsed envelope: the camelized payload plus its paging/notifications. */
+interface Unwrapped {
+  data: unknown;
+  pagination: Pagination | null;
+  notifications: GoreloNotification[];
+  isSuccess: boolean | null;
+}
+
+/** A single `Notifications[]` entry (camelized), carrying the 6-digit `code`. */
+export interface GoreloNotification {
+  code?: string | null;
+  message?: string | null;
+  propertyName?: string | null;
+  actionHint?: string | null;
+  docUrl?: string | null;
+}
+
+/**
+ * Camelize a parsed Gorelo response and peel the standard envelope: return `Data`
+ * as the payload plus any `DataContext.Pagination` and `Notifications`. A bare array
+ * or a body without the envelope markers passes through as the payload, so config
+ * endpoints (bare arrays) and any pre-envelope shape still parse.
+ */
+function unwrap(raw: unknown): Unwrapped {
+  const v = rekey(raw, camelKey);
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>;
+    const enveloped =
+      "data" in o && ("isSuccess" in o || "statusCode" in o || "notifications" in o || "dataContext" in o);
+    if (enveloped) {
+      const dc = o.dataContext && typeof o.dataContext === "object" ? (o.dataContext as Record<string, unknown>) : null;
+      const pg = dc && dc.pagination && typeof dc.pagination === "object" ? (dc.pagination as Pagination) : null;
+      return {
+        data: o.data,
+        pagination: pg,
+        notifications: Array.isArray(o.notifications) ? (o.notifications as GoreloNotification[]) : [],
+        isSuccess: typeof o.isSuccess === "boolean" ? o.isSuccess : null,
+      };
+    }
+  }
+  return { data: v, pagination: null, notifications: [], isSuccess: null };
+}
+
+/** Pull the first 6-digit `Notifications[].Code` out of a raw error body, if any. */
+export function firstNotificationCode(body: string): string | null {
+  if (!body) return null;
+  try {
+    for (const n of unwrap(JSON.parse(body)).notifications) {
+      if (typeof n?.code === "string" && /^\d{6}$/.test(n.code)) return n.code;
+    }
+  } catch {
+    // non-JSON / unparseable body — no code to surface.
+  }
+  return null;
+}
 
 /**
  * Strip trailing '/' characters in a single linear scan. A regex like
@@ -100,7 +219,7 @@ export class GoreloClient {
       }
       break;
     }
-    throw new GoreloError(`GET ${path} failed`, lastStatus, lastBody);
+    throw GoreloError.fromBody(`GET ${path} failed`, lastStatus, lastBody);
   }
 
   /**
@@ -118,18 +237,20 @@ export class GoreloClient {
     let cursor: string | null = null;
     const sep = path.includes("?") ? "&" : "?";
     for (let page = 1; page <= maxPages; page++) {
-      const qs = new URLSearchParams({ pageSize: String(pageSize) });
+      const qs = new URLSearchParams({ pageSize: String(clampPageSize(pageSize)) });
       if (cursor) qs.set("cursor", cursor);
       const raw = await this.getJsonWithRetry<unknown>(`${path}${sep}${qs.toString()}`);
       if (Array.isArray(raw)) {
         out.push(...(raw as T[])); // not (yet) paginated — bare array
         return out;
       }
-      const env = (raw ?? {}) as { data?: unknown; nextCursor?: string | null; hasMore?: boolean };
-      const items = Array.isArray(env.data) ? (env.data as T[]) : asArray<T>(raw);
+      // Since 2026-08, paging lives in DataContext.Pagination (signed cursors); the
+      // page rows are the envelope's Data. unwrap() camelizes both.
+      const env = unwrap(raw);
+      const items = asArray<T>(env.data);
       out.push(...items);
-      cursor = env.nextCursor ?? null;
-      const more = env.hasMore ?? (cursor != null && items.length > 0);
+      cursor = env.pagination?.nextCursor ?? null;
+      const more = env.pagination?.hasMore ?? (cursor != null && items.length > 0);
       if (!more || !cursor) return out;
       if (page === maxPages) {
         breadcrumb(`Gorelo paged ${path}: stopped at ${maxPages} pages (${out.length} rows) with more remaining`);
@@ -154,7 +275,8 @@ export class GoreloClient {
     try {
       const res = await this.request(`/v1/assets/agents/${encodeURIComponent(id)}`, { method: "GET" });
       if (!res.ok) return null;
-      return (await res.json()) as PublicDeviceResponse;
+      // Single-object endpoint: the device sits under the envelope's Data (camelized).
+      return (unwrap(await res.json()).data as PublicDeviceResponse | null) ?? null;
     } catch {
       return null;
     }
@@ -180,7 +302,8 @@ export class GoreloClient {
     const raw = await this.getJsonWithRetry<unknown>(
       `/v1/clients/${encodeURIComponent(String(clientId))}/locations`,
     );
-    return asArray<PublicClientLocationResponse>(raw);
+    // Enveloped list (single page — no cursor param on this endpoint): rows are Data.
+    return asArray<PublicClientLocationResponse>(unwrap(raw).data);
   }
 
   /**
@@ -192,17 +315,24 @@ export class GoreloClient {
     const res = await this.request("/v1/tickets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cmd),
+      // 2026-08: Gorelo requires PascalCase request fields and rejects unknown/
+      // misspelled ones with a 400. The relay models the command in camelCase and
+      // only ever sets documented CreatePublicTicketCommand fields, so pascalizing
+      // its keys yields exactly the accepted field set (no stray field introduced).
+      body: JSON.stringify(rekey(cmd, pascalKey)),
     });
     const body = await res.text().catch(() => "");
     if (!res.ok) {
-      throw new GoreloError("POST /v1/tickets failed", res.status, body);
+      throw GoreloError.fromBody("POST /v1/tickets failed", res.status, body);
     }
+    let parsed: unknown;
     try {
-      return JSON.parse(body) as unknown;
+      parsed = JSON.parse(body) as unknown;
     } catch {
       return body;
     }
+    // Peel the envelope so the caller reads the create result ({ id }) directly.
+    return unwrap(parsed).data ?? parsed;
   }
 
   /**
@@ -222,11 +352,26 @@ export class GoreloClient {
   ): Promise<PublicTicketListResponse> {
     const qs = new URLSearchParams();
     if (params?.cursor) qs.set("cursor", params.cursor);
-    if (params?.pageSize != null) qs.set("pageSize", String(params.pageSize));
+    // pageSize outside 1–200 is now a 400 (was silently clamped); sortBy/sortOrder
+    // outside the documented values are also rejected. Callers already pass valid
+    // sort values; clamp pageSize defensively so a bad caller can't trip the 400.
+    if (params?.pageSize != null) qs.set("pageSize", String(clampPageSize(params.pageSize)));
     if (params?.sortBy) qs.set("sortBy", params.sortBy);
     if (params?.sortOrder) qs.set("sortOrder", params.sortOrder);
     const q = qs.toString();
-    return this.getJsonWithRetry<PublicTicketListResponse>(`/v1/tickets${q ? `?${q}` : ""}`, maxAttempts);
+    const raw = await this.getJsonWithRetry<unknown>(`/v1/tickets${q ? `?${q}` : ""}`, maxAttempts);
+    // Flatten the envelope into the relay's normalized shape: rows from Data, paging
+    // hoisted from DataContext.Pagination back to the top level callers already read.
+    const env = unwrap(raw);
+    const pg = env.pagination ?? {};
+    return {
+      data: asArray<PublicTicketListItem>(env.data),
+      totalCount: pg.totalCount,
+      nextCursor: pg.nextCursor ?? null,
+      previousCursor: pg.previousCursor ?? null,
+      hasMore: pg.hasMore,
+      hasPrevious: pg.hasPrevious,
+    };
   }
 
   /**
@@ -268,9 +413,10 @@ function asArray<T>(raw: unknown): T[] {
 }
 
 /**
- * Extract the created ticket's GUID from a POST /v1/tickets response.
- * CONFIRMED (live swagger CreatePublicTicketResult): the response is now
- * `{ "id": "<uuid>" }` — a GUID, not a human ticket number. The Halo mock uses
+ * Extract the created ticket's GUID from a POST /v1/tickets response. Since 2026-08
+ * the create result is wrapped in the standard envelope; `createTicket` already
+ * peels it, so the value passed here is the camelized `CreatePublicTicketResult`
+ * (`{ "id": "<uuid>" }`) — a GUID, not a human ticket number. The Halo mock uses
  * this uuid to correlate the created ticket, log it, and read the human
  * number/displayNumber back via GET /v1/tickets (GoreloClient.resolveTicketNumber).
  * `id` is checked first; `ticketId` (the earlier field name) and the rest are
