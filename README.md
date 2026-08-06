@@ -124,10 +124,10 @@ local state is fully isolated from prod) and local queues/crons. The vitest suit
 (`npm test`) likewise runs against an isolated in-memory D1 — neither touches prod.
 
 Outbound calls to **Gorelo are real**: point `GORELO_BASE_URL` / `GORELO_API_KEY` in
-`.dev.vars` at whatever tenant you want to exercise. That means a `triggered`/ticket-
-creating request against the local Worker files a **real** Gorelo ticket — use an
-obvious `TEST —` title, or exercise no-write paths (e.g. an alert `heartbeat`, or the
-health endpoints) when you don't want side effects.
+`.dev.vars` at whatever tenant you want to exercise. That means a `triggered` alert
+against the local Worker posts a **real** Gorelo alert (and a Halo press files a **real**
+ticket) — use an obvious `TEST —` title, or exercise no-write paths (an alert
+`heartbeat`, or the health endpoints) when you don't want side effects.
 
 ### Dev container
 
