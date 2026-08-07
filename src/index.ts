@@ -19,8 +19,10 @@ const SYNC_CRON = "0 */6 * * *";
 const SENTRY_DSN =
   "https://e84c861f90b9a7e94e45bef4a3efae8f@o4511867765719040.ingest.us.sentry.io/4511867771355136";
 
-// `SENTRY_DISABLED` is truthy for 1/true/yes/on (case-insensitive) — mirrors debugOn().
-const sentryDisabled = (env: Env): boolean => /^(1|true|yes|on)$/i.test(env.SENTRY_DISABLED ?? "");
+// Master gate for the whole Sentry integration — OFF unless `SENTRY_ENABLED` is
+// explicitly truthy (1/true/yes/on, case-insensitive; mirrors debugOn()). Production
+// opts in via wrangler.toml [vars]; tests and `wrangler dev` leave it unset.
+const sentryEnabled = (env: Env): boolean => /^(1|true|yes|on)$/i.test(env.SENTRY_ENABLED ?? "");
 
 /**
  * Sentry options for `withSentry` (below), built per invocation from `env`.
@@ -36,9 +38,10 @@ const sentryDisabled = (env: Env): boolean => /^(1|true|yes|on)$/i.test(env.SENT
 function sentryOptions(env: Env): Sentry.CloudflareOptions {
   return {
     dsn: SENTRY_DSN,
-    // Off in tests (vitest.config.ts sets SENTRY_DISABLED) so the suite never emits
-    // to the DSN, and available as a dev/local override. Active in production.
-    enabled: !sentryDisabled(env),
+    // The whole integration is gated on SENTRY_ENABLED: off by default (SDK
+    // initializes but sends nothing — no events, no spans, no egress), so tests and
+    // local dev never reach the DSN. Production sets SENTRY_ENABLED="true".
+    enabled: sentryEnabled(env),
     // Capture 100% of traces. Low-volume relay; lower this if Sentry quota is a concern.
     tracesSampleRate: 1.0,
     dataCollection: {
