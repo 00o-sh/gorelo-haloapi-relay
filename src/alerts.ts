@@ -287,36 +287,42 @@ function buildDescription(alert: Alert): string {
  * else the alert's `customer` matched by exact name in the client mirror, else the
  * alert's `host` matched to a mirrored device's client, else CATCHALL_CLIENT_ID.
  */
-async function resolveClientId(env: Env, alert: Alert): Promise<number> {
+async function resolveTarget(env: Env, alert: Alert): Promise<{ clientId: number; resource: string }> {
+  // Gorelo links an alert to an asset only when `Resource` is the device's Gorelo id
+  // (the deviceId uuid) — it resolves that into the alert's sourceId/sourceType=4
+  // internally. A hostname string does NOT resolve. So when the alert's host matches a
+  // mirrored device, send that device's id as `Resource` and file the alert under the
+  // device's own client — that's what makes the portal's asset link resolve. Unknown
+  // hosts fall back to the raw host string (a display label, no link).
+  const host = normalizeHost(alert.host);
+  const device = host ? await findDeviceFullByHostname(env.DB, host) : null;
+  const resource = device?.agent_id || alert.host;
+
   const explicit = Number(env.ALERT_CLIENT_ID);
-  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  if (Number.isFinite(explicit) && explicit > 0) return { clientId: explicit, resource };
+  if (device?.client_id) return { clientId: device.client_id, resource };
 
   if (alert.customer) {
     const rows = await listClientRows(env.DB, alert.customer, 5);
     const want = alert.customer.trim().toLowerCase();
     const exact = rows.find((r) => (r.name ?? "").trim().toLowerCase() === want);
-    if (exact) return exact.id;
+    if (exact) return { clientId: exact.id, resource };
   }
 
-  const host = normalizeHost(alert.host);
-  if (host) {
-    const device = await findDeviceFullByHostname(env.DB, host);
-    if (device?.client_id) return device.client_id;
-  }
-
-  return Number(env.CATCHALL_CLIENT_ID) || 0;
+  return { clientId: Number(env.CATCHALL_CLIENT_ID) || 0, resource };
 }
 
 /** Build a Gorelo PostAlertRequest for an alert (optionally overriding name/severity/description). */
 function buildAlertRequest(
   clientId: number,
   alert: Alert,
+  resource: string,
   overrides: Partial<PostAlertRequest> = {},
 ): PostAlertRequest {
   return {
     name: alert.title,
     clientId,
-    resource: alert.host, // the host/service the alert is raised for
+    resource, // device id when the host matched a mirrored device, else the host string
     severity: alertLevel(alert.severity),
     description: buildDescription(alert),
     ...overrides,
@@ -417,9 +423,9 @@ async function applyAlert(env: Env, alert: Alert, eventKey: string): Promise<Out
     // Gorelo alerts are create-only (no close), so post a "Resolved: …" alert to
     // signal the clear, then mark our row resolved. The post is the gate: on failure
     // we leave the alert open so a retry re-posts.
-    const clientId = await resolveClientId(env, alert);
+    const { clientId, resource } = await resolveTarget(env, alert);
     await client.postAlert(
-      buildAlertRequest(clientId, alert, {
+      buildAlertRequest(clientId, alert, resource, {
         name: `Resolved: ${existing.title || alert.title}`,
         description: `Resolved.\n\n${buildDescription(alert)}`,
       }),
@@ -456,8 +462,8 @@ async function applyAlert(env: Env, alert: Alert, eventKey: string): Promise<Out
   }
 
   // No open alert (new, or re-triggered after a resolve) -> post a fresh Gorelo alert.
-  const clientId = await resolveClientId(env, alert);
-  await client.postAlert(buildAlertRequest(clientId, alert));
+  const { clientId, resource } = await resolveTarget(env, alert);
+  await client.postAlert(buildAlertRequest(clientId, alert, resource));
   await putAlert(env.DB, {
     dedupe_key: alert.dedupe_key,
     monitor_id: alert.monitor_id,

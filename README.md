@@ -483,10 +483,18 @@ Events map to Gorelo's **native alert** endpoint — `POST /v1/alerts/` (`PostAl
 | Alert field | Gorelo alert field (`PostAlertRequest`) |
 |---|---|
 | `title` | `Name` |
-| `host` | `Resource` (the host/service the alert is raised for) |
+| `host` | `Resource` — the matched device's **Gorelo id** (deviceId uuid) when `host` resolves to a mirrored device, else the raw `host` string. See asset linking below. |
 | `severity` | `Severity` (`AlertLevel` int) — **fixed** mapping (Gorelo's level enum is not tenant-customizable): `critical`→1 (Critical), `warning`→3 (Warning), `info`→4 (Info/Low). 1 = Critical is confirmed against the Gorelo alerts UI. |
 | `message` + `details` + metadata (monitor/source/customer/timestamp/`dedupe_key`) | `Description` (plain text) |
-| `customer` / `host` | `ClientId` — `ALERT_CLIENT_ID`, else `customer` matched by exact name against the client mirror, else a mirrored device matched by `host`, else `CATCHALL_CLIENT_ID` |
+| `host` / `customer` | `ClientId` — `ALERT_CLIENT_ID`, else the matched device's client, else `customer` matched by exact name against the client mirror, else `CATCHALL_CLIENT_ID` |
+
+**Asset linking.** Gorelo deep-links an alert to an asset only when `Resource` is the
+device's **Gorelo id** (the deviceId uuid) — it resolves that into the alert's
+`sourceId`/`sourceType=4` server-side. A hostname string does **not** resolve. So the
+relay looks `host` up in its device mirror and, on a match, sends that device's id as
+`Resource` and files the alert under the **device's own client** (so the portal's asset
+link resolves and the alert lands on the right client). Hosts with no mirrored device
+fall back to the raw `host` string — a display label with no link.
 
 **Does Gorelo resolve/dedupe by a stored remote id or key?** No. Gorelo **does** have a
 native alert endpoint (`POST /v1/alerts/`), but it is **create-only** — the response is a

@@ -49,6 +49,7 @@ beforeEach(async () => {
   await env.DB.batch([
     env.DB.prepare(`DELETE FROM alerts`),
     env.DB.prepare(`DELETE FROM alert_heartbeats`),
+    env.DB.prepare(`DELETE FROM devices`),
   ]);
 });
 
@@ -182,6 +183,34 @@ describe("POST /v1/alerts — triggered & dedup", () => {
     expect(alertPosts).toBe(1);
     const row = await alertRow("DB-SERVER-01:daily-restore");
     expect(row?.message).toBe("The daily transaction-log restore failed after all retry attempts.");
+  });
+});
+
+describe("POST /v1/alerts — asset linking (Resource = device id)", () => {
+  it("sends the mirrored device's id as Resource and files under the device's client", async () => {
+    // A mirrored device: hostname is normalized (lower-case), agent_id is the Gorelo
+    // deviceId that Gorelo resolves into the alert's asset link.
+    await env.DB.prepare(`INSERT INTO devices (hostname, agent_id, client_id) VALUES (?, ?, ?)`)
+      .bind("linked-host", "08ded86b-f38e-3b6b-0015-5d0107000000", 16097)
+      .run();
+
+    // Host arrives in any case; the customer name points elsewhere, but the matched
+    // device wins for both Resource (its id) and ClientId (its own client).
+    const res = await post(
+      baseAlert({ host: "LINKED-HOST", customer: "Example Customer", dedupe_key: "LINKED-HOST:daily-restore" }),
+    );
+    expect(res.status).toBe(202);
+    expect(alertPosts).toBe(1);
+    expect(lastAlertBody).toMatchObject({
+      Resource: "08ded86b-f38e-3b6b-0015-5d0107000000",
+      ClientId: 16097,
+    });
+  });
+
+  it("falls back to the raw host string when no device matches", async () => {
+    const res = await post(baseAlert());
+    expect(res.status).toBe(202);
+    expect(lastAlertBody).toMatchObject({ Resource: "DB-SERVER-01" });
   });
 });
 
