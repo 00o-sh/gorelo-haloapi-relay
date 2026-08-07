@@ -25,15 +25,18 @@ a top-of-file param() would fail to parse.
 .NOTES
 - FIRST RUN: set $WhatIf = $true to see exactly what it WOULD delete (deletes nothing).
 - Schedule OUTSIDE the import window (e.g. 03:00 local, after the nightly restore + retries).
-- Keep $ExtractedRetentionDays >= the lookback window (in days) to avoid re-extraction churn.
+- Extracted retention defaults to the lookback window + $ExtractedRetentionBufferDays (1 day),
+  so a folder whose archive is still inside the download window is never pruned. Set
+  $ExtractedRetentionDays to a positive number only if you want a fixed day count instead.
 - Age is by LastWriteTimeUtc.
 #>
 
 # ── Config ──────────────────────────────────────────────────────────────────────
-$ConfigPath             = 'C:\ProgramData\NYSPHI\config.json'  # restore config: folder paths + lookback
-$ExtractedRetentionDays = 7        # keep extracted TRN folders this many days
-$IncomingRetentionHours = 0        # 0 => use the config's DownloadLookbackHours
-$WhatIf                 = $false   # $true = report only, delete nothing (use on the first run)
+$ConfigPath                   = 'C:\ProgramData\NYSPHI\config.json'  # restore config: folder paths + lookback
+$ExtractedRetentionDays       = 0   # 0 => derive from the lookback (recommended); or set an explicit day count
+$ExtractedRetentionBufferDays = 1   # when deriving: keep extracted folders this many days PAST the lookback window
+$IncomingRetentionHours       = 0   # 0 => use the config's DownloadLookbackHours
+$WhatIf                       = $false   # $true = report only, delete nothing (use on the first run)
 
 $ErrorActionPreference = 'Stop'
 $script:LogFile = $null
@@ -70,6 +73,13 @@ $lookbackHours =
     elseif ($cfg.PSObject.Properties['DownloadLookbackHours']) { [int]$cfg.DownloadLookbackHours }
     else { 168 }
 
+# Extracted retention: an explicit day count if set, else the lookback window (rounded up
+# to whole days) plus a buffer — so a folder whose archive is still inside the download
+# window is never pruned (which would just make the next run re-download and re-extract it).
+$lookbackDays  = [int][math]::Ceiling($lookbackHours / 24.0)
+$retentionDays = if ($ExtractedRetentionDays -gt 0) { [int]$ExtractedRetentionDays }
+                 else { $lookbackDays + [int]$ExtractedRetentionBufferDays }
+
 # --- Protected paths (never delete at or under these) ----------------------------
 $protected = New-Object System.Collections.Generic.List[string]
 if ($cfg.PSObject.Properties['StandbyFile'] -and -not [string]::IsNullOrWhiteSpace([string]$cfg.StandbyFile)) {
@@ -90,7 +100,7 @@ function Test-Protected {
     return $false
 }
 
-Write-CleanupLog ("Cleanup start. Incoming retention {0}h; Extracted retention {1}d; WhatIf={2}." -f $lookbackHours, $ExtractedRetentionDays, $WhatIf)
+Write-CleanupLog ("Cleanup start. Incoming retention {0}h (~{1}d); Extracted retention {2}d; WhatIf={3}." -f $lookbackHours, $lookbackDays, $retentionDays, $WhatIf)
 foreach ($prot in $protected) { Write-CleanupLog ("Protected (never deleted): {0}" -f $prot) }
 
 $nowUtc   = (Get-Date).ToUniversalTime()
@@ -119,7 +129,7 @@ else { Write-CleanupLog -Level WARN -Message "IncomingFolder missing or not conf
 
 # --- 2. Extracted TRN folders older than the retention ---------------------------
 if (-not [string]::IsNullOrWhiteSpace($extracted) -and (Test-Path -LiteralPath $extracted -PathType Container)) {
-    $cutoff = $nowUtc.AddDays(-[double]$ExtractedRetentionDays)
+    $cutoff = $nowUtc.AddDays(-[double]$retentionDays)
     foreach ($d in @(Get-ChildItem -LiteralPath $extracted -Directory -ErrorAction SilentlyContinue)) {
         if (Test-Protected $d.FullName) { continue }
         # Only prune folders a run finished extracting; skip an in-progress/partial one.

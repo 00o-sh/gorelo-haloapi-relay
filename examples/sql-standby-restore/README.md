@@ -186,10 +186,12 @@ lookback:
 - **`Incoming\` archives** (`*.zip`/`*.7z`) older than the **download lookback**
   (`DownloadLookbackHours`) — beyond the lookback they'd never be re-downloaded anyway;
   deleting anything *inside* it just makes AzCopy re-pull it, so the lookback is the floor.
-- **`Extracted\<archive>_<fingerprint>\`** folders older than `$ExtractedRetentionDays`
-  (default 7) that carry the `.extract-complete` marker — their logs are already applied
-  and tracked in `msdb`. Keep `$ExtractedRetentionDays` ≥ the lookback (in days) to avoid
-  re-extraction churn.
+- **`Extracted\<archive>_<fingerprint>\`** folders that carry the `.extract-complete`
+  marker, older than the retention — their logs are already applied and tracked in `msdb`.
+  Retention **defaults to the lookback window + `$ExtractedRetentionBufferDays` (1 day)**, so
+  a folder whose archive is still inside the download window is never pruned (which would
+  just make the next run re-download and re-extract it). Set `$ExtractedRetentionDays` to a
+  positive number only if you want a fixed day count instead.
 
 It **hard-protects** the standby (`.tuf`) folder and every `AdditionalTrnFolders` entry
 (read from the config) and only ever operates inside `Incoming`/`Extracted`. It has **no
