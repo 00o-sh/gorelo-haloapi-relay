@@ -1,0 +1,19 @@
+{
+  "_comment": "Generic example of the alerting-related config a SQL standby-restore job reads. Placeholder values only - no real secrets, SAS URLs, IPs, customer names, or database names belong in source control. Copy the Alert* / StatusFile / Stale* keys into your real (NTFS-protected) config.json alongside your existing restore settings.",
+
+  "SqlInstance": "localhost",
+  "DatabaseName": "db_example",
+  "StateFolder": "F:\\RestoreScratch\\AutomationState",
+  "LogFolder": "C:\\ProgramData\\Example\\Logs",
+
+  "AlertRelayUrl": "<REPLACE_WITH_WORKER_HOST>/v1/alerts",
+  "AlertSharedSecret": "<REPLACE_WITH_ALERT_SOURCE_SECRET>",
+  "AlertSource": "SQL Standby Restore",
+  "Customer": "<REPLACE_WITH_GORELO_CLIENT_NAME>",
+  "AlertHost": "DB-SERVER-01",
+  "AlertMaxRetries": 4,
+
+  "StatusFile": "F:\\RestoreScratch\\AutomationState\\status.json",
+  "StaleWarnHours": 26,
+  "StaleCriticalHours": 48
+}
