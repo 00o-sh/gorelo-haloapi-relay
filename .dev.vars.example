@@ -7,6 +7,12 @@ GORELO_API_KEY="your-gorelo-api-key"
 # Gates POST /admin/sync (sent as X-Admin-Key, X-API-Key, or Authorization: Bearer).
 ADMIN_KEY="another-long-random-secret"
 
+# Optional: silence the Sentry error monitor during `wrangler dev`. The DSN is
+# hardcoded in src/index.ts (a DSN is a write-only ingest id, not a secret), so local
+# runs would otherwise emit to the production Sentry project. Set to "true" to keep dev
+# quiet. Tests are already disabled via vitest.config.ts.
+# SENTRY_DISABLED="true"
+
 # Monitoring-alert ingress (POST /v1/alerts). Each source (customer) has its own secret
 # bound to its own IPs: a request must present the source's secret (Authorization: Bearer
 # <secret> or X-Alert-Key: <secret>) AND come from that source's allowlisted IP.

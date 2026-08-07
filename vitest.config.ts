@@ -19,6 +19,10 @@ export default defineConfig({
         bindings: {
           GORELO_BASE_URL: "https://api.usw.gorelo.io",
           ENFORCE_IP_ALLOWLIST: "false",
+          // Disable the Sentry monitor in tests (src/index.ts reads this): the SDK
+          // initializes but sends nothing, so the suite never emits to the hardcoded
+          // DSN and specs stay hermetic.
+          SENTRY_DISABLED: "true",
           // Keep the token gate off by default in tests so resource-endpoint specs
           // don't need to mint a bearer token. Production sets this in wrangler.toml
           // (currently "enforce"); the dedicated enforcement specs override the mode

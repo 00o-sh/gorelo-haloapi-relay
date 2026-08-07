@@ -56,6 +56,12 @@ export interface Env {
   // catch-all/no-contact fallback. Any other value (or unset) suppresses it.
   SEND_TICKET_CREATED_EMAIL?: string;
   DEBUG_LOGS?: string; // "true" enables verbose HALO CAPTURE/RESPONSE body logging (PII)
+  // Kill switch for the Sentry error monitor (src/index.ts). "true"/"1"/"yes"/"on"
+  // sets Sentry `enabled: false` so the SDK initializes but sends nothing — no events,
+  // no spans, no egress. Set in vitest.config.ts so the test suite never emits to the
+  // hardcoded DSN; also usable in .dev.vars to keep `wrangler dev` quiet. Unset in
+  // production, where Sentry is active.
+  SENTRY_DISABLED?: string;
 
   // --- Monitoring alerts endpoint (POST /v1/alerts) ---------------------------
   // Each alert "source" (a customer) has its OWN shared secret bound to its OWN IP
