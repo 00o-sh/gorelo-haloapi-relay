@@ -54,6 +54,13 @@ $CriticalHours   = 48
 $Suppress        = 24      # hours; set to 0 while testing so repeats aren't suppressed
 $SetCustomFields = $false  # $true to also mirror status onto asset custom fields
 
+# Maintenance/quiet window (local HH:mm, wraps midnight): while the nightly import runs
+# and retries, suppress alerts so a restore-in-progress / late feed never pages. Genuine
+# problems still surface once the window closes. Blank either value to disable. Default
+# covers the ~23:30 job start plus up to ~2h of 10-minute retries, with buffer.
+$QuietStart = '23:15'
+$QuietEnd   = '02:30'
+
 $ErrorActionPreference = 'Stop'
 
 # GoreloAction wrapper: use the real cmdlet under the RMM agent; print otherwise so the
@@ -66,6 +73,12 @@ function Raise-Alert {
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string]$Description
     )
+    # Stay silent during the nightly import/retry window; genuine problems surface once
+    # the window closes and the watch evaluates again.
+    if ($script:InQuietWindow) {
+        Write-Host ("[quiet window] suppressed alert: ({0}) {1}" -f $Severity, $Name)
+        return
+    }
     if ($script:HasGoreloAction) {
         GoreloAction -Alert -Severity $Severity -Name $Name -Description $Description -Suppress $Suppress
     }
@@ -91,6 +104,23 @@ function Get-HoursAgo {
     param([datetime]$WhenUtc)
     return [Math]::Round(((Get-Date).ToUniversalTime() - $WhenUtc).TotalHours, 1)
 }
+
+# True if the current LOCAL time is inside the maintenance/quiet window. Handles a window
+# that wraps past midnight (Start > End). Blank Start/End disables it.
+function Test-QuietWindow {
+    param([string]$Start, [string]$End)
+    if ([string]::IsNullOrWhiteSpace($Start) -or [string]::IsNullOrWhiteSpace($End)) { return $false }
+    try {
+        $now = (Get-Date).TimeOfDay
+        $s = [datetime]::ParseExact($Start, 'HH:mm', $null).TimeOfDay
+        $e = [datetime]::ParseExact($End,   'HH:mm', $null).TimeOfDay
+    }
+    catch { return $false }
+    if ($s -le $e) { return ($now -ge $s -and $now -lt $e) }  # same-day window
+    return ($now -ge $s -or $now -lt $e)                      # wraps past midnight
+}
+
+$script:InQuietWindow = Test-QuietWindow -Start $QuietStart -End $QuietEnd
 
 # --- 1. Liveness: is the status file present and recent? --------------------------
 

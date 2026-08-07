@@ -145,6 +145,15 @@ Config variables (defaults suit a nightly feed):
 | `$CriticalHours` | `48` | recovery point older ⇒ *critically stale* (Severity 1) |
 | `$Suppress` | `24` | re-alert at most once per this many hours |
 | `$SetCustomFields` | `$false` | `$true` to also mirror recovery point/outcome to asset fields |
+| `$QuietStart` / `$QuietEnd` | `23:15` / `02:30` | maintenance/quiet window (local `HH:mm`, wraps midnight): suppress all alerts while the nightly import runs and retries. Blank either to disable. |
+
+**Maintenance window.** The watch reads `status.json` (the last *completed* run's state),
+not live SQL, so it never sees the mid-restore `SINGLE_USER`/`RESTORING` transitions — and
+the file is written atomically, so it never reads a half-written one. The quiet window is
+the belt-and-suspenders: during the nightly import + retry window it stays silent so a
+restore-in-progress or a slightly-late feed can't page; a genuinely broken run still
+surfaces the moment the window closes. Set the window to your job's schedule (default
+covers a ~23:30 start plus ~2h of retries).
 
 Gorelo severities: **1 = Critical, 2 = Error, 3 = Warning**.
 
