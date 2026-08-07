@@ -129,20 +129,26 @@ Create a Gorelo RMM **PowerShell script** from `Watch-SqlStandbyRestore.ps1` and
 schedule it on the SQL host every few minutes. It reads `status.json` and raises native
 alerts for the two things Path A can't see.
 
-Parameters (defaults suit a nightly feed):
+> **No `param()` block.** Gorelo wraps the script (it injects the `GoreloAction` cmdlet
+> and `$gorelo:` variables) before running it, so your code is no longer at the top of
+> the file — and PowerShell requires `param()` to be the first statement, so it fails to
+> parse (`Unexpected token 'param'`). Configure via the plain **variables in the Config
+> block** at the top of the script instead.
 
-| Param | Default | Meaning |
+Config variables (defaults suit a nightly feed):
+
+| Variable | Default | Meaning |
 |---|---|---|
-| `-StatusFile` | `F:\RestoreScratch\AutomationState\status.json` | must match the job's `StatusFile` |
-| `-DeadManHours` | `26` | file older than this ⇒ *automation not running* (Severity 2) |
-| `-WarnHours` | `26` | recovery point older ⇒ *stale* (Severity 3) |
-| `-CriticalHours` | `48` | recovery point older ⇒ *critically stale* (Severity 1) |
-| `-Suppress` | `24` | re-alert at most once per this many hours |
-| `-SetCustomFields` | off | also mirror recovery point/outcome to asset fields |
+| `$StatusFile` | `F:\RestoreScratch\AutomationState\status.json` | must match the job's `StatusFile` |
+| `$DeadManHours` | `26` | file older than this ⇒ *automation not running* (Severity 2) |
+| `$WarnHours` | `26` | recovery point older ⇒ *stale* (Severity 3) |
+| `$CriticalHours` | `48` | recovery point older ⇒ *critically stale* (Severity 1) |
+| `$Suppress` | `24` | re-alert at most once per this many hours |
+| `$SetCustomFields` | `$false` | `$true` to also mirror recovery point/outcome to asset fields |
 
 Gorelo severities: **1 = Critical, 2 = Error, 3 = Warning**.
 
-If you pass `-SetCustomFields`, create these text custom fields on the asset first:
+If you set `$SetCustomFields = $true`, create these text custom fields on the asset first:
 `asset.sqlStandbyRecoveryPoint`, `asset.sqlStandbyLastRun`, `asset.sqlStandbyOutcome`.
 
 ---
@@ -156,10 +162,9 @@ Both paths write real alerts into Gorelo, so test deliberately (mirrors the repo
   `TEST —` title. Trigger then resolve with the same `dedupe_key`; the relay returns
   `{ "accepted": true, "action": "created" | "resolved" | ... }`. Retries are safe.
 - **Path B** — run `Watch-SqlStandbyRestore.ps1` interactively (outside the RMM agent
-  it prints the alerts instead of raising them). In the Gorelo script editor set
-  **`-Suppress 0`** while testing so repeats aren't swallowed; set it back to `24` for
-  production. Force a stale condition by pointing `-StatusFile` at an old file, or a
-  missing one, to see each branch.
+  it prints the alerts instead of raising them). Set **`$Suppress = 0`** while testing so
+  repeats aren't swallowed; set it back to `24` for production. Force a stale condition by
+  pointing `$StatusFile` at an old file, or a missing one, to see each branch.
 
 ## Security
 

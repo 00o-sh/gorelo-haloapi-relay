@@ -1,4 +1,3 @@
-#requires -version 5.1
 <#
 .SYNOPSIS
 Gorelo RMM monitor (Path B): watches a SQL standby-restore status file and raises
@@ -32,23 +31,28 @@ your restore job writes.
 .NOTES
 Gorelo severities: 1 = Critical, 2 = Error, 3 = Warning.
 GoreloAction is only available inside a Gorelo RMM run; outside it (interactive
-testing) this script prints the alert instead. Set -Suppress 0 while testing.
+testing) this script prints the alert instead. Set $Suppress = 0 while testing.
 
-Custom fields to create in Gorelo first (if -SetCustomFields):
+NO param() BLOCK: Gorelo wraps this script (it injects the GoreloAction cmdlet and
+$gorelo: variables) before running it, so your code is no longer at the top of the
+file. PowerShell requires [CmdletBinding()]/param() to be the FIRST statement in a
+file, so a param() block fails to parse under the agent ("Unexpected token 'param'").
+Configure via the plain variables in the Config block below instead (or read them from
+Gorelo script variables / $gorelo: custom fields).
+
+Custom fields to create in Gorelo first (if $SetCustomFields = $true):
   asset.sqlStandbyRecoveryPoint   (text)
   asset.sqlStandbyLastRun         (text)
   asset.sqlStandbyOutcome         (text)
 #>
 
-[CmdletBinding()]
-param(
-    [string]$StatusFile        = 'F:\RestoreScratch\AutomationState\status.json',
-    [int]   $DeadManHours      = 26,
-    [int]   $WarnHours         = 26,
-    [int]   $CriticalHours     = 48,
-    [int]   $Suppress          = 24,
-    [switch]$SetCustomFields
-)
+# ── Config ──────────────────────────────────────────────────────────────────────
+$StatusFile      = 'F:\RestoreScratch\AutomationState\status.json'
+$DeadManHours    = 26
+$WarnHours       = 26
+$CriticalHours   = 48
+$Suppress        = 24      # hours; set to 0 while testing so repeats aren't suppressed
+$SetCustomFields = $false  # $true to also mirror status onto asset custom fields
 
 $ErrorActionPreference = 'Stop'
 
