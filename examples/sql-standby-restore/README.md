@@ -35,6 +35,7 @@ even backstops Path A (a failed run still surfaces as freshness decay).
 | `Send-GoreloAlert.ps1` | on the SQL host, next to the restore script | Relay client — dot-sourced by the restore job. POSTs to `/v1/alerts` with Bearer auth, retry, and idempotency. Never throws into the restore. |
 | `restore-integration.example.ps1` | same | The status-file writer + error-classifier the restore job dot-sources and calls. |
 | `Watch-SqlStandbyRestore.ps1` | pasted into a Gorelo RMM script | Path B — the liveness + freshness monitor using `GoreloAction`. |
+| `Clean-SqlRestoreScratch.ps1` | Task Scheduler **or** a Gorelo RMM script | Retention cleanup — prunes old `Incoming\` archives + `Extracted\` folders. See [Cleanup](#cleanup). |
 | `config.example.json` | — | The `Alert*` / `StatusFile` / `Stale*` keys to merge into your real config. |
 
 ---
@@ -174,6 +175,30 @@ Both paths write real alerts into Gorelo, so test deliberately (mirrors the repo
   it prints the alerts instead of raising them). Set **`$Suppress = 0`** while testing so
   repeats aren't swallowed; set it back to `24` for production. Force a stale condition by
   pointing `$StatusFile` at an old file, or a missing one, to see each branch.
+
+## Cleanup
+
+The restore script has **no retention of its own** — downloaded archives (`Incoming\`) and
+extracted transaction-log folders (`Extracted\`) accumulate until the volume fills.
+`Clean-SqlRestoreScratch.ps1` prunes them, reading the same `config.json` for paths and the
+lookback:
+
+- **`Incoming\` archives** (`*.zip`/`*.7z`) older than the **download lookback**
+  (`DownloadLookbackHours`) — beyond the lookback they'd never be re-downloaded anyway;
+  deleting anything *inside* it just makes AzCopy re-pull it, so the lookback is the floor.
+- **`Extracted\<archive>_<fingerprint>\`** folders older than `$ExtractedRetentionDays`
+  (default 7) that carry the `.extract-complete` marker — their logs are already applied
+  and tracked in `msdb`. Keep `$ExtractedRetentionDays` ≥ the lookback (in days) to avoid
+  re-extraction churn.
+
+It **hard-protects** the standby (`.tuf`) folder and every `AdditionalTrnFolders` entry
+(read from the config) and only ever operates inside `Incoming`/`Extracted`. It has **no
+`param()` block**, so it runs equally as a Windows Task Scheduler task or a Gorelo RMM
+script.
+
+- **First run:** set `$WhatIf = $true` to log what it *would* delete without deleting.
+- **Schedule** it **outside the import window** (e.g. daily 03:00 local, after the restore
+  and its retries).
 
 ## Security
 
