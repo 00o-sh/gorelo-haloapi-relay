@@ -486,7 +486,7 @@ Events map to Gorelo's **native alert** endpoint — `POST /v1/alerts/` (`PostAl
 |---|---|
 | `title` | `Name` |
 | `host` | `Resource` (the host/service the alert is raised for) |
-| `severity` | `Severity` (`AlertLevel` int 1–4) — `info`→`ALERT_LEVEL_INFO`\|1, `warning`→`ALERT_LEVEL_WARNING`\|2, `critical`→`ALERT_LEVEL_CRITICAL`\|3. **TODO(verify)** which int is which in the Gorelo UI (unlabeled enum) |
+| `severity` | `Severity` (`AlertLevel` int) — **fixed** mapping (Gorelo's level enum is not tenant-customizable): `critical`→1 (Critical), `warning`→3 (Warning), `info`→4 (Info/Low). 1 = Critical is confirmed against the Gorelo alerts UI. |
 | `message` + `details` + metadata (monitor/source/customer/timestamp/`dedupe_key`) | `Description` (plain text) |
 | `customer` / `host` | `ClientId` — `ALERT_CLIENT_ID`, else `customer` matched by exact name against the client mirror, else a mirrored device matched by `host`, else `CATCHALL_CLIENT_ID` |
 
