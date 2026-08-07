@@ -4,7 +4,7 @@
   "features": {
     // Node pinned to match CI (.github/workflows/ci.yml -> setup-node 26.5.1) so
     // "works locally" == "works in CI". Installed via nvm by the feature.
-    "ghcr.io/devcontainers/features/node:1": {
+    "ghcr.io/devcontainers/features/node:2": {
       "version": "26.5.1"
     }
   },
