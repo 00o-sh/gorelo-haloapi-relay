@@ -131,7 +131,7 @@
         "operationId": "public-cluster_",
         "parameters": [
           {
-            "name": "cursor",
+            "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "style": "form",
@@ -140,7 +140,7 @@
             }
           },
           {
-            "name": "pageSize",
+            "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "style": "form",
@@ -368,7 +368,7 @@
         "operationId": "public-cluster_",
         "parameters": [
           {
-            "name": "cursor",
+            "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "style": "form",
@@ -377,7 +377,7 @@
             }
           },
           {
-            "name": "pageSize",
+            "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "style": "form",
@@ -977,7 +977,7 @@
         "operationId": "public-cluster_",
         "parameters": [
           {
-            "name": "clientId",
+            "name": "ClientId",
             "in": "query",
             "description": "Optional client identifier to filter contacts by.",
             "style": "form",
@@ -987,7 +987,7 @@
             }
           },
           {
-            "name": "cursor",
+            "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "style": "form",
@@ -996,7 +996,7 @@
             }
           },
           {
-            "name": "pageSize",
+            "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "style": "form",
@@ -1472,7 +1472,7 @@
         "operationId": "public-cluster_",
         "parameters": [
           {
-            "name": "cursor",
+            "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "style": "form",
@@ -1481,7 +1481,7 @@
             }
           },
           {
-            "name": "pageSize",
+            "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "style": "form",
@@ -1770,7 +1770,7 @@
         "operationId": "public-cluster_",
         "parameters": [
           {
-            "name": "cursor",
+            "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
             "style": "form",
@@ -1779,7 +1779,7 @@
             }
           },
           {
-            "name": "pageSize",
+            "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
             "style": "form",
@@ -1790,7 +1790,7 @@
             }
           },
           {
-            "name": "sortBy",
+            "name": "SortBy",
             "in": "query",
             "description": "Sort column: `updatedOn` (default) or `createdOn`.",
             "style": "form",
@@ -1800,13 +1800,134 @@
             }
           },
           {
-            "name": "sortOrder",
+            "name": "SortOrder",
             "in": "query",
             "description": "Sort direction: `asc` or `desc` (default).",
             "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
+            }
+          },
+          {
+            "name": "StatusIds",
+            "in": "query",
+            "description": "Comma-separated status ids to include. Omit for every status.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ClientIds",
+            "in": "query",
+            "description": "Comma-separated client ids to include. Omit for every client.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PriorityIds",
+            "in": "query",
+            "description": "Comma-separated priority ids on the public scale — None=0, Urgent=1, High=2, Normal=3, Low=4.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "TypeIds",
+            "in": "query",
+            "description": "Comma-separated ticket type ids to include.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "LeadAssigneeIds",
+            "in": "query",
+            "description": "Comma-separated lead assignee ids to include.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ContactIds",
+            "in": "query",
+            "description": "Comma-separated contact ids to include.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "TagIds",
+            "in": "query",
+            "description": "Comma-separated tag ids; a ticket matches if it carries any of them.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "GroupIds",
+            "in": "query",
+            "description": "Comma-separated group ids; a ticket matches if it is subscribed to any of them.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Query",
+            "in": "query",
+            "description": "Keyword matched against the ticket title, number and display number. Up to 200 characters.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "UpdatedSince",
+            "in": "query",
+            "description": "ISO-8601 timestamp; keeps only tickets updated at or after it.",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "UpdatedBefore",
+            "in": "query",
+            "description": "ISO-8601 timestamp; keeps only tickets updated strictly before it.",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "CreatedSince",
+            "in": "query",
+            "description": "ISO-8601 timestamp; keeps only tickets created at or after it.",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "CreatedBefore",
+            "in": "query",
+            "description": "ISO-8601 timestamp; keeps only tickets created strictly before it.",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
             }
           }
         ],
@@ -2106,6 +2227,793 @@
           }
         }
       }
+    },
+    "/v1/tickets/{ticketId}/comments": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Adds a comment to a ticket. The comment is always recorded as coming from the API — the\r\ncaller cannot post as a specific user, and `To` and `Cc` are taken from the\r\nconversation rather than the request.",
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "Ticket identifier.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Comment details.",
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_CreatePublicCommentCommand"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_CreatePublicCommentCommand"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_CreatePublicCommentCommand"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/public-cluster_CreatePublicCommentCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicCommentResultBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicCommentResultBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_CreatePublicCommentResultBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Lists the comments on a ticket using cursor pagination. Comments read oldest-first by\r\ndefault, like a conversation top to bottom.\r\nFilter from broadest to narrowest: send nothing for every comment; conversationType\r\nto select kinds; or conversationTypeId together with\r\nconversationId for one specific conversation.",
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "Ticket identifier.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "ConversationType",
+            "in": "query",
+            "description": "Kinds to include: `1` Public, `2` Private, `3` Side Conversation, `4` Approval. Comma-separated on its own; a single value when paired with conversationId.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ConversationId",
+            "in": "query",
+            "description": "Identifier of the single conversation to read, from the conversations endpoint. Requires a single conversationType.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Cursor",
+            "in": "query",
+            "description": "Opaque pagination cursor from a previous page; omit for the first page.",
+            "style": "form",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "description": "Number of items per page. Clamped to 1–200 (default 50).",
+            "style": "form",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          },
+          {
+            "name": "SortBy",
+            "in": "query",
+            "description": "Sort column: `createdOn`.",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "default": "createdOn"
+            }
+          },
+          {
+            "name": "SortOrder",
+            "in": "query",
+            "description": "Sort direction: `asc` (default) or `desc`.",
+            "style": "form",
+            "schema": {
+              "type": "string",
+              "default": "asc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentListItemModelListBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentListItemModelListBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentListItemModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tickets/{ticketId}/attachments": {
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Uploads a single file to a ticket and returns its name and a temporary secure link. Pass\r\nthat name and link in a comment's `Attachments` when creating it.\r\nSend the file as `multipart/form-data` in a field named `file`. Any file type is\r\naccepted. This endpoint enforces no size rule of its own; a large file is rejected earlier\r\nby the infrastructure in front of it, which answers 413 rather than a validation error.",
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "Ticket identifier.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentAttachmentModelBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentAttachmentModelBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentAttachmentModelBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tickets/{ticketId}/conversations": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Lists the conversations on a ticket. Public and Private are the ticket's main thread and\r\ncome back with a null `Id`; Side Conversation and Approval carry a real `Id` that\r\ncan be passed to the comments endpoint as `conversationId`.\r\nType-specific details live on each type's own detail endpoint, so every row has the same\r\nlean shape.",
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "Ticket identifier.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicConversationListItemModelListBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicConversationListItemModelListBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicConversationListItemModelListBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tickets/{ticketId}/comments/{commentId}": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Gets a single comment on a ticket. Same shape as a comments-list item except that the full\r\n`BodyHtml` is always included, so there is no `BodyTruncated` field.",
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "Ticket identifier.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "description": "Comment identifier.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentModelBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentModelBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicCommentModelBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tickets/{ticketId}/approvals/{approvalId}": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Gets a single approval on a ticket, with its approvers. This is where approval status\r\nlives — the conversations list stays lean and does not carry it. `Status` is worked\r\nout from the approvers: Disapproved as soon as anyone disapproves, Approved once everyone\r\napproves, Pending otherwise.",
+        "operationId": "public-cluster_",
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "description": "Ticket identifier.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "approvalId",
+            "in": "path",
+            "description": "Approval identifier, from the conversations endpoint.",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicApprovalDetailModelBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicApprovalDetailModelBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_PublicApprovalDetailModelBaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/public-cluster_ObjectBaseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2181,6 +3089,76 @@
         },
         "additionalProperties": false,
         "description": "Request body for creating a client, along with its default location."
+      },
+      "public-cluster_CreatePublicCommentCommand": {
+        "type": "object",
+        "properties": {
+          "ConversationTypeId": {
+            "type": "integer",
+            "description": "1 Public, 2 Private, 3 Side Conversation, 4 Approval.",
+            "format": "int64"
+          },
+          "ConversationId": {
+            "type": "string",
+            "description": "Identifier of the conversation to post into. Required for Side Conversation and Approval,\r\nand rejected for Public and Private, which are the ticket's main thread.",
+            "nullable": true
+          },
+          "Body": {
+            "type": "string",
+            "description": "Comment body as HTML. Mentions go inside the HTML."
+          },
+          "CreatedByName": {
+            "type": "string",
+            "description": "Display name to show the comment as. The comment is still recorded as API-authored — a\r\nname cannot be used to post as a specific real user.",
+            "nullable": true
+          },
+          "Attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicCommentAttachmentModel"
+            },
+            "description": "Files to attach, as returned by the attachment upload endpoint."
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_CreatePublicCommentResult": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "Identifier of the created comment.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_CreatePublicCommentResultBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_CreatePublicCommentResult"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "public-cluster_CreatePublicContactCommand": {
         "required": [
@@ -2654,6 +3632,81 @@
         "additionalProperties": false,
         "description": "Request body for posting an external alert against a client."
       },
+      "public-cluster_PublicApprovalDetailModel": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "Approval identifier, as a string. Matches the `Id` from the conversations list."
+          },
+          "Type": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "Name": {
+            "type": "string",
+            "description": "Short label for the approval."
+          },
+          "Status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "Approvers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicApproverModel"
+            },
+            "description": "One row per person who must approve."
+          },
+          "CreatedOn": {
+            "type": "string",
+            "description": "Creation timestamp (UTC).",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Full details of one approval on a ticket — this is where approval status lives, the\r\nconversations list being deliberately lean. Attachments belong to the approval's comments\r\nrather than to the approval itself, so there is no attachments field here. Timestamps are UTC."
+      },
+      "public-cluster_PublicApprovalDetailModelBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_PublicApprovalDetailModel"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicApproverModel": {
+        "type": "object",
+        "properties": {
+          "ContactId": {
+            "type": "integer",
+            "description": "Identifier of the contact asked to approve.",
+            "format": "int64"
+          },
+          "Status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One person's response on an approval.\r\n            \r\nThere is deliberately no response timestamp here. The approver document carries a\r\n`submittedAt`, but it is written once when the approver is created and is never\r\nrewritten when they answer — every decided approver observed on Dev carried a\r\n`submittedAt` within 130ms of its approval's creation. Exposing it would publish a\r\ncreation time under a name that promises a response time."
+      },
       "public-cluster_PublicClientLocationRequest": {
         "required": [
           "Name"
@@ -3019,6 +4072,303 @@
         },
         "additionalProperties": false
       },
+      "public-cluster_PublicCommentAttachmentModel": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "File name."
+          },
+          "Url": {
+            "type": "string",
+            "description": "Temporary secure download link. Expires."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A file attached to a comment."
+      },
+      "public-cluster_PublicCommentAttachmentModelBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_PublicCommentAttachmentModel"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicCommentAuthorModel": {
+        "type": "object",
+        "properties": {
+          "Type": {
+            "type": "string",
+            "description": "One of `User`, `Contact`, `Automation`, `AI Agent`."
+          },
+          "Id": {
+            "type": "integer",
+            "description": "Identifier of the author. Null for authors that have no numeric id of their own —\r\nAI agents, automations, and comments created through the public API.",
+            "format": "int64",
+            "nullable": true
+          },
+          "Name": {
+            "type": "string",
+            "description": "Display name of the author."
+          },
+          "Email": {
+            "type": "string",
+            "description": "Email address of the author, where we have it.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Who wrote a comment."
+      },
+      "public-cluster_PublicCommentEmailInfoModel": {
+        "type": "object",
+        "properties": {
+          "Status": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "ErrorDetail": {
+            "type": "string",
+            "description": "Reason the send failed; null unless `Status` is `Failed`.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Delivery state of this comment's email. Recipients are not here: they belong to the\r\nconversation, not to one comment, and are served by the conversations endpoint."
+      },
+      "public-cluster_PublicCommentListItemModel": {
+        "type": "object",
+        "properties": {
+          "BodyTruncated": {
+            "type": "boolean",
+            "description": "True when the full HTML body is stored separately and was left out of the list to keep it\r\nfast. Fetch the single comment to get the complete Gorelo_PublicAPI.Tickets.Models.Tickets.PublicCommentModel.BodyHtml."
+          },
+          "Id": {
+            "type": "string",
+            "description": "Comment identifier.",
+            "format": "uuid"
+          },
+          "ConversationId": {
+            "type": "string",
+            "description": "Identifier of the conversation this comment belongs to, as a string. Null for public and\r\nprivate comments, which are the ticket's main thread rather than a separate conversation.",
+            "nullable": true
+          },
+          "ConversationType": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "Source": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "BodyHtml": {
+            "type": "string",
+            "description": "Comment body as HTML.",
+            "nullable": true
+          },
+          "BodyText": {
+            "type": "string",
+            "description": "Comment body without HTML — the markdown stored alongside it. Comments written before\r\nthat was stored fall back to the HTML with its tags removed."
+          },
+          "Author": {
+            "$ref": "#/components/schemas/public-cluster_PublicCommentAuthorModel"
+          },
+          "EmailInfo": {
+            "$ref": "#/components/schemas/public-cluster_PublicCommentEmailInfoModel"
+          },
+          "Attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicCommentAttachmentModel"
+            },
+            "description": "Files attached to the comment."
+          },
+          "SentimentScore": {
+            "type": "number",
+            "description": "Customer sentiment scored on incoming comments; null when not scored.",
+            "format": "double",
+            "nullable": true
+          },
+          "Reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicCommentReactionModel"
+            },
+            "description": "Reactions left on the comment."
+          },
+          "CreatedOn": {
+            "type": "string",
+            "description": "Creation timestamp (UTC).",
+            "format": "date-time"
+          },
+          "UpdatedOn": {
+            "type": "string",
+            "description": "Last-updated timestamp (UTC).",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A comment as it appears in the comments list. Adds Gorelo_PublicAPI.Tickets.Models.Tickets.PublicCommentListItemModel.BodyTruncated, which the\r\nsingle-comment endpoint omits because it always returns the full body."
+      },
+      "public-cluster_PublicCommentListItemModelListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicCommentListItemModel"
+            },
+            "nullable": true
+          },
+          "DataContext": {
+            "$ref": "#/components/schemas/public-cluster_PaginationDataContext"
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicCommentModel": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "Comment identifier.",
+            "format": "uuid"
+          },
+          "ConversationId": {
+            "type": "string",
+            "description": "Identifier of the conversation this comment belongs to, as a string. Null for public and\r\nprivate comments, which are the ticket's main thread rather than a separate conversation.",
+            "nullable": true
+          },
+          "ConversationType": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "Source": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "BodyHtml": {
+            "type": "string",
+            "description": "Comment body as HTML.",
+            "nullable": true
+          },
+          "BodyText": {
+            "type": "string",
+            "description": "Comment body without HTML — the markdown stored alongside it. Comments written before\r\nthat was stored fall back to the HTML with its tags removed."
+          },
+          "Author": {
+            "$ref": "#/components/schemas/public-cluster_PublicCommentAuthorModel"
+          },
+          "EmailInfo": {
+            "$ref": "#/components/schemas/public-cluster_PublicCommentEmailInfoModel"
+          },
+          "Attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicCommentAttachmentModel"
+            },
+            "description": "Files attached to the comment."
+          },
+          "SentimentScore": {
+            "type": "number",
+            "description": "Customer sentiment scored on incoming comments; null when not scored.",
+            "format": "double",
+            "nullable": true
+          },
+          "Reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicCommentReactionModel"
+            },
+            "description": "Reactions left on the comment."
+          },
+          "CreatedOn": {
+            "type": "string",
+            "description": "Creation timestamp (UTC).",
+            "format": "date-time"
+          },
+          "UpdatedOn": {
+            "type": "string",
+            "description": "Last-updated timestamp (UTC).",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A comment on a ticket. Timestamps are UTC."
+      },
+      "public-cluster_PublicCommentModelBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "$ref": "#/components/schemas/public-cluster_PublicCommentModel"
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicCommentReactionModel": {
+        "type": "object",
+        "properties": {
+          "UserId": {
+            "type": "integer",
+            "description": "Identifier of the user who reacted.",
+            "format": "int64"
+          },
+          "ReactionId": {
+            "type": "integer",
+            "description": "Identifier of the reaction.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A reaction left on a comment."
+      },
       "public-cluster_PublicContactResponse": {
         "type": "object",
         "properties": {
@@ -3161,6 +4511,73 @@
           },
           "DataContext": {
             "$ref": "#/components/schemas/public-cluster_PaginationDataContext"
+          },
+          "Notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_Error"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "public-cluster_PublicConversationListItemModel": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "Conversation identifier, as a string. Null for the Public and Private rows, which are\r\nthe ticket's main thread and have no id to drill into.",
+            "nullable": true
+          },
+          "Type": {
+            "$ref": "#/components/schemas/public-cluster_PublicCodeModel"
+          },
+          "Name": {
+            "type": "string",
+            "description": "Short label for the conversation."
+          },
+          "Email": {
+            "type": "string",
+            "description": "Address this conversation is directed to — the ticket's contact for Public, the side\r\nconversation's own address, the first approver for Approval. Null for Private, which is\r\nnever emailed.",
+            "nullable": true
+          },
+          "CcEmails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Addresses copied on this conversation — the ticket's CC contacts for Public, the side\r\nconversation's CC list. Empty for Private and Approval, neither of which copies anyone."
+          },
+          "CreatedOn": {
+            "type": "string",
+            "description": "Creation timestamp (UTC).",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A conversation on a ticket. Deliberately lean and identical in shape for every conversation\r\ntype — type-specific details (approvers, side-conversation email) live on that type's own\r\ndetail endpoint. Timestamps are UTC."
+      },
+      "public-cluster_PublicConversationListItemModelListBaseResponse": {
+        "type": "object",
+        "properties": {
+          "StatusCode": {
+            "$ref": "#/components/schemas/public-cluster_HttpStatusCode"
+          },
+          "IsSuccess": {
+            "type": "boolean"
+          },
+          "Data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/public-cluster_PublicConversationListItemModel"
+            },
+            "nullable": true
+          },
+          "DataContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "nullable": true,
+            "example": null
           },
           "Notifications": {
             "type": "array",
@@ -3673,7 +5090,7 @@
             "format": "int64",
             "nullable": true
           },
-          "ClientLocationId": {
+          "LocationId": {
             "type": "integer",
             "description": "Identifier of the client location the ticket belongs to.",
             "format": "int64",
