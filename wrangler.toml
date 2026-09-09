@@ -250,7 +250,7 @@ name = "tier2tickets-relay-staging"
 # TODO(staging): the STAGING Cloudflare account id. Deploys fail loudly until it is set,
 # which is deliberate — without it, `--env staging` would publish into whichever tenant
 # you are currently logged into, i.e. production.
-account_id = "TODO_STAGING_CLOUDFLARE_ACCOUNT_ID"
+account_id = "c6452865d04ed5bd485084005c60cb02"
 
 [env.staging.observability.logs]
 enabled = true
