@@ -15,8 +15,10 @@ import { flushPendingJira, jiraSubscriber } from "../src/egress/jira/index.js";
 //
 // !!! MOCK-ONLY !!!  Every Jira request here is stubbed. These specs prove the WIRING
 // and control flow (enrollment, ledger dedup, queue drain, dead-letter), NOT that the
-// real Jira Cloud API accepts our create/comment/transition bodies. That still needs
-// live verification against a real site (see REFACTOR-NOTES.md TOMORROW).
+// real Jira Cloud API accepts our create/comment/transition bodies. That live check was
+// done separately as a manual pass (2026-09-09: created HD-2, commented, transitioned
+// To Do → Done against a real free Jira site — see PR #87 / REFACTOR-NOTES.md); these
+// automated specs deliberately stay mocked so CI never touches a live Jira.
 
 const HOST = "https://t2t.example.com";
 const AGENT_UUID = "3fa85f64-5717-4562-b3fc-2c963f66afa6";

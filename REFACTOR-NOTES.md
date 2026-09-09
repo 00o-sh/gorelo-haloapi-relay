@@ -263,15 +263,26 @@ wiring on create, ledger-key storage, enrollment gating (off / unenrolled), reso
 comment + transition, the `pending_jira` drain, the create dedup guard, and the
 dead-letter.
 
-**Still theoretical — needs the live site above (nothing hits real Jira in tests):**
-- `POST /rest/api/3/issue` — that Jira Cloud accepts our ADF `description`, the
-  `issuetype`/`project`/`labels` fields, and returns a `key`.
-- `POST /rest/api/3/issue/{key}/comment` — that the ADF comment body is accepted.
-- `GET` + `POST /rest/api/3/issue/{key}/transitions` — that the transition lookup +
-  apply works and that your workflow actually offers the configured transition name.
-- Basic auth (`email:apiToken`) against a real site.
-- The end-to-end create → resolve round trip.
+**✅ Verified live (2026-09-09, PR #87 comment).** The full create → resolve flow was run
+against a real free-tier Jira Cloud site (via `wrangler dev` + `.dev.vars` enrolling a real
+Gorelo clientId), confirming every call that was previously mock-only:
+- `POST /rest/api/3/issue` — created issue `HD-2` (project `HD`, type `Security`); ADF
+  `description` + `issuetype`/`project`/`labels` accepted, `key` returned.
+- `POST /rest/api/3/issue/{key}/comment` — resolution comment posted on `HD-2`.
+- `GET` + `POST /rest/api/3/issue/{key}/transitions` — `HD-2` transitioned `To Do → Done`
+  (case-insensitive match on `resolvedTransition`).
+- Basic auth (`email:apiToken`) and the end-to-end create → resolve round trip both work;
+  real Gorelo tickets `TK-1059`/`TK-1060` and Jira issue `HD-2` resulted (test tenant).
 
-The **Gorelo** side is likewise only mock-verified here (a pre-existing property of the
-repo's tests) — the ticket create/number read-back still needs its own live check per the
-existing README runtime-verify notes.
+So the three REST calls are no longer theoretical — the whole Jira path is live-verified.
+The **automated suite still uses a mocked Jira client** (it proves wiring/control flow, not
+the live API); that live check is a manual pass on top of it, not part of CI.
+
+> **Tenant-id gotcha (not a bug):** if your test Gorelo tenant differs from the one
+> `wrangler.toml`'s `DEFAULT_GROUP_ID`/`DEFAULT_TYPE_ID`/`HUNTRESS_TAG_ID`/`FALLBACK_TAG_ID`
+> were set for (the Salient production tenant), the Gorelo create fails with error `070101`
+> ("Group id X is invalid" / "tag(s) do not exist"). Override those ids in `.dev.vars` for a
+> different sandbox tenant.
+
+The **Gorelo** side of these tests is still only mock-verified in CI (a pre-existing property
+of the repo's tests), but the live pass above exercised the real Gorelo create/read-back too.
