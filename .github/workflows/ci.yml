@@ -36,6 +36,13 @@ jobs:
       - name: Verify allowScripts allowlist
         run: npm run check:allowscripts
 
+      # Keep wrangler.dev.toml answering for every production var and holding the
+      # safe local posture — wrangler does not merge configs, so a var added to
+      # wrangler.toml is simply absent (undefined) in local dev until it is added
+      # here too. See scripts/check-dev-config.mjs.
+      - name: Verify dev Wrangler config
+        run: npm run check:devconfig
+
       - name: Typecheck
         run: npm run typecheck
 
