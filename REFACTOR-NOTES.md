@@ -16,6 +16,23 @@ The single rule the whole layout serves: **`ingress/` and `egress/` never import
 other.** Both may import `core/`; `index.ts` may import all three. Enforced by
 `scripts/check-import-boundaries.mjs` (CI + `npm run lint:boundaries`).
 
+> **Rebased onto the advanced `main` (post-hoc).** After the initial push, `main` turned
+> out to have moved ~20 commits ahead of where this work forked — it had gained a
+> **monitoring-alert relay** (`POST /v1/alerts`) and **Sentry** instrumentation across the
+> very files this refactor moved. Per your call, both branches were merged onto the new
+> `main`:
+> - `src/alerts.ts` → **`src/ingress/alerts.ts`** (it's an inbound path), imports rewired.
+> - `index.ts` now carries main's Sentry `withSentry` wrap + alert routing **and** the
+>   egress Jira wiring together.
+> - `core/db.ts` schema is now **v5**, combining the Jira retry queue + the alert/heartbeat
+>   tables; `0001_init.sql` carries `created_tickets` + `alerts` + `alert_heartbeats`.
+> - `core/types.ts` / `wrangler.toml` / `.dev.vars.example` / `README` carry both feature sets.
+>
+> Everything below still holds; the only counts that changed are the test totals — the
+> full suite is now **167** on the refactor branch (Part A + main's alert/index/gorelo/sync
+> specs) and **184** on the Jira branch (adds the 17 Jira specs). The ingress↔egress
+> boundary, the event contract, and the egress design are unchanged by the merge.
+
 ---
 
 ## What changed, per phase
