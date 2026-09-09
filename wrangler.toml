@@ -299,6 +299,11 @@ ENFORCE_IP_ALLOWLIST = "true"
 ENABLE_TIER2 = "true"
 ENABLE_HUNTRESS = "true"
 
+# OFF for staging. Staging tenants are usually seeded from production, so a real client's
+# JIRA_TARGETS entry would mirror test tickets into their live Jira. Enable deliberately
+# (with a staging-only JIRA_TARGETS) only when exercising the fan-out end to end.
+ENABLE_JIRA = "false"
+
 # --- Gorelo IDs: TENANT-SPECIFIC, must be re-derived against the STAGING tenant -------
 # Run `GORELO_API_KEY=<staging key> ./scripts/gorelo-ids.sh` and paste the results.
 # "0" is a deliberate placeholder: staging is not functional until these are filled.
