@@ -116,14 +116,78 @@ For local development, copy `.dev.vars.example` to `.dev.vars` (git-ignored) and
 run `npm run dev` (which uses `wrangler.dev.toml`, not the production config above).
 See the workflow below.
 
+## Staging
+
+`[env.staging]` in `wrangler.toml` deploys the relay to a **separate Cloudflare tenant**:
+
+```bash
+npm run deploy:staging       # wrangler deploy --env staging
+```
+
+Everything above that block in `wrangler.toml` is production, and a bare `npm run deploy`
+still uses it. Wrangler does **not** inherit `vars`, `d1_databases` or `queues` into an
+environment (it warns, and the binding is simply absent), so `[env.staging]` repeats all
+of them. `account_id` and `triggers` *are* inherited, so staging restates both rather
+than silently following production. `npm run check:configs` fails if staging stops
+covering a production var, or if any staging identifier still points at production.
+
+Staging deliberately keeps production's **security** posture and drops its **side
+effects**:
+
+| Var | prod | staging | why |
+|---|---|---|---|
+| `ENFORCE_IP_ALLOWLIST` | `true` | `true` | staging is a public Worker whose endpoints file tickets |
+| `HALO_TOKEN_ENFORCE` | `enforce` | `enforce` | validating the real token posture is the point of staging |
+| `SEND_TICKET_CREATED_EMAIL` | `true` | `false` | a staging tenant seeded from prod carries real addresses |
+| `SENTRY_ENABLED` | `true` | `false` | the DSN is hardcoded; staging noise would land in the prod project |
+| `DEBUG_LOGS` | `false` | `false` | capture bodies are PII/PHI and persist in Workers Logs |
+
+Gorelo's base URL is **regional, not per-tenant** — the tenant is chosen by the
+`GORELO_API_KEY` secret. Staging therefore keeps the same `GORELO_BASE_URL` and reaches
+the staging Gorelo tenant purely via its own key.
+
+### First-time staging setup
+
+Secrets and D1 are **per-environment**; nothing carries over from production.
+
+```bash
+# 1. Fill the TODO(staging) values in wrangler.toml [env.staging]:
+#    account_id (the staging Cloudflare account) — without it, --env staging deploys
+#    into whichever tenant you are logged into, i.e. production.
+
+# 2. Create staging's own D1 + queue in that tenant, then paste the database_id back
+wrangler d1 create tier2tickets-relay-staging --env staging
+wrangler queues create tier2tickets-sync-staging --env staging
+npm run db:migrate:staging
+
+# 3. Re-derive the tenant-specific Gorelo ids against the STAGING key and paste them in
+#    (DEFAULT_GROUP_ID, DEFAULT_TYPE_ID, CATCHALL_CLIENT_ID, and the three tag ids are
+#     "0" placeholders until you do — staging is not functional before this step)
+GORELO_API_KEY=<staging key> ./scripts/gorelo-ids.sh
+
+# 4. Push staging's secrets (each needs --env staging)
+wrangler secret put GORELO_API_KEY --env staging      # the STAGING tenant's key
+wrangler secret put ADMIN_KEY --env staging
+wrangler secret put ALERT_SHARED_SECRET --env staging
+./scripts/halo-cred.sh tier2 --env staging            # --env passes through
+
+# 5. Deploy, then seed the staging mirror
+npm run deploy:staging
+curl -X POST https://<staging-host>/admin/sync -H "X-Admin-Key: <staging ADMIN_KEY>"
+```
+
+Because environments exist, a bare `wrangler deploy` now prints a warning that no target
+environment was given. That is informational: with no `--env`, it deploys the top-level
+production config, which is what `npm run deploy` intends.
+
 ## Local development
 
 Develop and test **without deploying to prod**. Local runs use their own Wrangler
 config, **`wrangler.dev.toml`** — `npm run dev` passes `-c wrangler.dev.toml`, while
 `wrangler.toml` stays the production config that `npm run deploy` uses. Wrangler does not
 merge the two: the dev file stands alone, so it repeats every binding and carries its own
-`[vars]`. `npm run check:devconfig` (also a CI step) fails if `wrangler.toml` gains a var
-the dev config doesn't answer for, so they can't silently drift.
+`[vars]`. `npm run check:configs` (also a CI step) fails if `wrangler.toml` gains a var
+this config doesn't answer for, so they can't silently drift.
 
 The dev config differs from production where production is wrong-to-hostile locally:
 
