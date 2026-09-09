@@ -19,6 +19,9 @@ export default defineConfig({
         bindings: {
           GORELO_BASE_URL: "https://api.usw.gorelo.io",
           ENFORCE_IP_ALLOWLIST: "false",
+          // SENTRY_ENABLED is deliberately unset here: the Sentry monitor is off by
+          // default, so the suite never emits to the hardcoded DSN and specs stay
+          // hermetic. (Production opts in via wrangler.toml [vars].)
           // Keep the token gate off by default in tests so resource-endpoint specs
           // don't need to mint a bearer token. Production sets this in wrangler.toml
           // (currently "enforce"); the dedicated enforcement specs override the mode
@@ -39,6 +42,9 @@ export default defineConfig({
           NOTIFLY_URLS: "jsons://hooks.example.com/dead-letter",
           HALO_CLIENT_ID: "halo-test-id",
           HALO_CLIENT_SECRET: "halo-test-secret",
+          // Monitoring-alert ingress (POST /v1/alerts). IP allowlist is off in tests
+          // (ENFORCE_IP_ALLOWLIST=false), so only the shared secret gates the endpoint.
+          ALERT_SHARED_SECRET: "alert-test-secret",
         },
       },
     }),
