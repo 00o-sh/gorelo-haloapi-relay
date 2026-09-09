@@ -30,22 +30,47 @@ afterEach(() => {
 const json = (body: unknown): Response =>
   new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
 
+// --- 2026-08 Gorelo wire-format helpers ----------------------------------------
+// Responses now carry PascalCase fields inside the standard envelope, with paging
+// under DataContext.Pagination. Keep the camelCase fixtures below and convert at the
+// mock boundary so the mocked bytes match the real wire shape the relay must parse.
+function rekey(v: unknown, fn: (k: string) => string): unknown {
+  if (Array.isArray(v)) return v.map((x) => rekey(x, fn));
+  if (v && typeof v === "object") {
+    const o: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) o[fn(k)] = rekey(val, fn);
+    return o;
+  }
+  return v;
+}
+const pascal = (v: unknown): unknown => rekey(v, (k) => (k ? k[0]!.toUpperCase() + k.slice(1) : k));
+
+/** A single-page enveloped list response (PascalCase Data, paging in DataContext). */
+const listEnv = (items: unknown[], pagination?: Record<string, unknown>): Response =>
+  json({
+    StatusCode: 200,
+    IsSuccess: true,
+    Data: pascal(items),
+    DataContext: { Pagination: pagination ?? { NextCursor: null, HasMore: false, TotalCount: items.length } },
+    Notifications: [],
+  });
+
 function installFetch(): void {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = new URL(new Request(input as RequestInfo, init).url);
     const p = url.pathname;
-    if (p === "/v1/assets/agents") return json(data.agents);
-    if (p === "/v1/clients") return json(data.clients);
+    if (p === "/v1/assets/agents") return listEnv(data.agents);
+    if (p === "/v1/clients") return listEnv(data.clients);
     const loc = p.match(/^\/v1\/clients\/(\d+)\/locations$/);
     if (loc) {
       const cid = Number(loc[1]);
       if (data.failLocations.has(cid)) return new Response("bad request", { status: 400 });
-      return json(data.locations[cid] ?? []);
+      return listEnv(data.locations[cid] ?? []);
     }
     if (p === "/v1/contacts") {
       // Bulk fetch (no clientid): return every contact flattened.
       if (data.failAllContacts) return new Response("bad request", { status: 400 });
-      return json(Object.values(data.contacts).flat());
+      return listEnv(Object.values(data.contacts).flat());
     }
     throw new Error(`unmocked fetch: ${p}`);
   }) as typeof fetch;
@@ -220,31 +245,27 @@ describe("syncAll delta reconcile (inline tables + location fan-out)", () => {
   });
 
   it("follows cursor pagination on the bulk list endpoints (all pages land in the mirror)", async () => {
-    // Gorelo's 2026-07-24 change: /v1/contacts et al. return { data, nextCursor,
-    // hasMore } and page at 50, so the sync must follow the cursor to get every row.
-    const contactsByCursor: Record<string, unknown> = {
-      "": {
-        data: [
+    // 2026-08: signed cursors + paging under DataContext.Pagination, PascalCase Data.
+    // The sync must follow NextCursor across pages to get every row.
+    const contactsByCursor: Record<string, Response> = {
+      "": listEnv(
+        [
           { id: 1, primaryEmail: "a@corp.com", firstName: "A", lastName: "A", clientId: 10, clientLocationId: 100 },
           { id: 2, primaryEmail: "b@corp.com", firstName: "B", lastName: "B", clientId: 10, clientLocationId: 100 },
         ],
-        nextCursor: "page2",
-        hasMore: true,
-      },
-      page2: {
-        data: [
-          { id: 3, primaryEmail: "c@corp.com", firstName: "C", lastName: "C", clientId: 10, clientLocationId: 100 },
-        ],
-        nextCursor: null,
-        hasMore: false,
-      },
+        { NextCursor: "page2", HasMore: true },
+      ),
+      page2: listEnv(
+        [{ id: 3, primaryEmail: "c@corp.com", firstName: "C", lastName: "C", clientId: 10, clientLocationId: 100 }],
+        { NextCursor: null, HasMore: false },
+      ),
     };
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = new URL(new Request(input as RequestInfo, init).url);
       const p = url.pathname;
-      if (p === "/v1/assets/agents") return json({ data: [], nextCursor: null, hasMore: false });
-      if (p === "/v1/clients") return json({ data: [{ id: 10, name: "Corp" }], nextCursor: null, hasMore: false });
-      if (p === "/v1/contacts") return json(contactsByCursor[url.searchParams.get("cursor") ?? ""]);
+      if (p === "/v1/assets/agents") return listEnv([]);
+      if (p === "/v1/clients") return listEnv([{ id: 10, name: "Corp" }]);
+      if (p === "/v1/contacts") return contactsByCursor[url.searchParams.get("cursor") ?? ""]!.clone();
       throw new Error(`unmocked fetch: ${p}`);
     }) as typeof fetch;
 

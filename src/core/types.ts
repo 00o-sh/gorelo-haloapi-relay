@@ -1,6 +1,13 @@
 // Hand-written subset of the Gorelo public API types actually used by this relay.
 // Ground truth: https://api.usw.gorelo.io/swagger/v1/swagger.json
 // (Verify against the live spec before deploy — see the runtime-verify checklist in README.)
+//
+// NOTE (2026-08 API): Gorelo now wraps every response in a standard envelope
+// `{ StatusCode, IsSuccess, Data, DataContext, Notifications }`, uses PascalCase
+// field names, and carries paging under `DataContext.Pagination`. These types stay
+// in the relay's camelCase model: `src/gorelo.ts` camelizes responses (and unwraps
+// the envelope) on the way in and pascalizes the create body on the way out, so the
+// shapes below describe the payload AFTER that bridge — not the raw wire format.
 
 /** A queued unit of location-sync work: refresh + reconcile one client's sites. */
 export interface SyncLocationsMessage {
@@ -54,6 +61,35 @@ export interface Env {
   // leaves it off. Enrollment is still per-client via JIRA_TARGETS, so a client with no
   // target entry is never sent to Jira even when this is on.
   ENABLE_JIRA?: string; // "true" | "false" (default false)
+  // Master on/off for the Sentry error monitor (src/index.ts). OFF by default —
+  // Sentry sends NOTHING (no events, no spans, no egress) unless this is explicitly
+  // truthy ("true"/"1"/"yes"/"on"). Production opts in via wrangler.toml [vars];
+  // tests and `wrangler dev` leave it unset, so they never emit to the hardcoded DSN.
+  SENTRY_ENABLED?: string;
+
+  // --- Monitoring alerts endpoint (POST /v1/alerts) ---------------------------
+  // Each alert "source" (a customer) has its OWN shared secret bound to its OWN IP
+  // allowlist: a request must present the source's secret AND originate from that
+  // source's IP(s), so one customer's secret is useless from another's network.
+  //
+  // ALERT_SOURCES is a comma/space-separated list of source keys (unset => the single
+  // built-in `default`). Per key the credential pair is resolved by name (see
+  // src/alerts.ts sourceVars): `default` -> ALERT_SHARED_SECRET + ALERT_ALLOWED_IPS;
+  // any other key `<k>` -> ALERT_SECRET_<K> (secret) + ALERT_IPS_<K> (var), with the
+  // key upper-cased and non-alphanumerics replaced by `_`. Those per-source vars are
+  // read dynamically by name, so onboarding a customer needs no code/type change —
+  // just set the two vars and add the key to ALERT_SOURCES.
+  ALERT_SOURCES?: string;
+  // `default` source: exact IPs and/or IPv4 CIDR ranges (comma/space/newline separated)
+  // permitted to POST alerts (matched via CF-Connecting-IP). Enforced only when
+  // ENFORCE_IP_ALLOWLIST is on; empty while enforced => the source is rejected.
+  ALERT_ALLOWED_IPS?: string;
+  // Optional Gorelo client id alerts are raised against (PostAlertRequest.ClientId).
+  // Unset => resolve the alert's `customer` against the client mirror by exact name,
+  // then the alert's `host` against a mirrored device, else CATCHALL_CLIENT_ID.
+  ALERT_CLIENT_ID?: string; // int as string
+  // Severity->AlertLevel is a fixed, hardcoded mapping (Gorelo's level enum is not
+  // tenant-customizable) — see alertLevel() in src/alerts.ts. No env override.
 
   // secrets (wrangler secret put ...)
   GORELO_API_KEY: string; // X-API-Key sent to Gorelo
@@ -70,6 +106,11 @@ export interface Env {
   //      "apiToken": "…", "resolvedTransition": "Done" }]
   // Set via `wrangler secret put JIRA_TARGETS`; never commit it to wrangler.toml.
   JIRA_TARGETS?: string;
+  // Shared secret for the `default` alert source (POST /v1/alerts). Accepted as
+  // `Authorization: Bearer <secret>` (preferred) or `X-Alert-Key: <secret>`; valid only
+  // from an ALERT_ALLOWED_IPS address. Unset => the default source can't authenticate.
+  // Additional per-customer secrets are set as ALERT_SECRET_<KEY> (read dynamically).
+  ALERT_SHARED_SECRET?: string;
 
   // Per-product Halo mock OAuth credentials (issue #51). Each product authenticates
   // with its OWN client_id, so credentials are resolved per matched product via the
@@ -105,6 +146,29 @@ export type PublicTicketPriority = 0 | 1 | 2 | 3 | 4;
  * TODO(verify): confirm which int is the "integration/portal/API" source in the Gorelo UI.
  */
 export type TicketSource = 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * AlertLevel — Gorelo's alert severity enum, integers [1,2,3,4]. Confirmed against the
+ * Gorelo alerts UI: 1 = Critical (2 = Error/High, 3 = Warning, 4 = Info/Low). The enum
+ * is fixed (not tenant-customizable); the relay's severity->level mapping lives in
+ * alertLevel() (src/alerts.ts).
+ */
+export type AlertLevel = 1 | 2 | 3 | 4;
+
+/**
+ * Body for Gorelo's native alert endpoint, POST /v1/alerts/ ("Posts an external alert
+ * against a client"). Modeled camelCase; GoreloClient pascalizes it on the way out
+ * (Name/ClientId/Resource/Severity/Description). Required: name, clientId, resource.
+ * The response is a boolean success envelope — there is NO alert id, and no
+ * update/close/GET, so alert dedup + the open→resolved lifecycle are owned by the relay.
+ */
+export interface PostAlertRequest {
+  name: string; // alert title
+  clientId: number; // the client the alert relates to
+  resource: string; // host/service the alert is raised for (e.g. "SPH-RVR-SQL01")
+  severity?: AlertLevel;
+  description?: string; // free-text detail
+}
 
 /** Body for POST /v1/tickets. No email field — requires numeric clientId/contactId. */
 export interface CreatePublicTicketCommand {
@@ -153,7 +217,12 @@ export interface PublicTicketListItem {
   contactId?: number | null;
 }
 
-/** GET /v1/tickets envelope (PublicTicketListItemModelPagedResponse). */
+/**
+ * GET /v1/tickets — the relay's NORMALIZED list shape. On the wire (2026-08) the
+ * rows are the envelope's `Data` and the paging fields live under
+ * `DataContext.Pagination`; GoreloClient.listTickets flattens both back to this
+ * top-level shape the relay already consumed.
+ */
 export interface PublicTicketListResponse {
   data?: PublicTicketListItem[] | null;
   totalCount?: number;
@@ -197,7 +266,9 @@ export interface PublicDeviceResponse {
 export interface PublicClientResponse {
   id: number;
   name?: string | null;
-  domains?: Array<{ domain?: string | null; name?: string | null }> | null;
+  // Web domains (PublicClientWebDomainResponse): the domain string is `name`
+  // (camelized from `Name`). Not consumed by the sync today; kept for reference.
+  domains?: Array<{ name?: string | null }> | null;
 }
 
 /** GET /v1/contacts?clientid={id} item. */
