@@ -333,5 +333,5 @@ binding = "DB"
 database_name = "tier2tickets-relay-staging"
 # TODO(staging): paste the id from `wrangler d1 create tier2tickets-relay-staging --env staging`.
 # The nil UUID until then, so a deploy fails rather than binding anything real.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "a7c245d5-25c2-412c-9547-3bba704852ab"
 migrations_dir = "migrations"
