@@ -14,26 +14,51 @@ import type { Env } from "../../core/types.js";
  * secret (never in D1, never logged), the same single-secret pattern NOTIFLY_URLS uses.
  */
 
+/**
+ * How a target authenticates to Jira Cloud. Both are ordinary Atlassian account
+ * credentials — Jira Cloud has no per-app service identity separate from an
+ * account — so **the account behind either mode should be a dedicated Atlassian
+ * service account** (support.atlassian.com/user-management/docs/understand-service-accounts/),
+ * never a real employee's personal login: a service account has no password, isn't
+ * tied to anyone leaving, and doesn't count against the site's user-license seats.
+ *
+ * - `basic` — email + API token, sent as `Authorization: Basic base64(email:token)`
+ *   directly against the site's own `baseUrl`. Simplest to set up; the token is
+ *   generated at id.atlassian.com under whichever account (ideally the service
+ *   account) is logged in.
+ * - `oauth` — a service account's OAuth 2.0 credential (client id/secret), created
+ *   in Atlassian Administration → Directory → Service accounts → Create credentials
+ *   → OAuth 2.0. Exchanged via `client_credentials` at `auth.atlassian.com` for a
+ *   short-lived bearer token — no redirect/consent step, genuine machine-to-machine
+ *   auth. Requests go through `api.atlassian.com/ex/jira/{cloudId}/...` instead of
+ *   the site directly, so the client resolves `cloudId` once (cached per instance)
+ *   via the token's accessible-resources.
+ */
+export type JiraAuth =
+  | { mode: "basic"; email: string; apiToken: string }
+  | { mode: "oauth"; oauthClientId: string; oauthClientSecret: string };
+
 /** One co-managed client's Jira destination, from the JIRA_TARGETS secret. */
 export interface JiraTarget {
   /** Gorelo client id this target routes for (the enrollment key). */
   clientId: number;
-  /** Jira Cloud site base URL, e.g. "https://acme.atlassian.net". */
+  /**
+   * Jira Cloud site base URL, e.g. "https://acme.atlassian.net". Always required:
+   * `basic` mode calls it directly; `oauth` mode uses it only to pick the right
+   * `cloudId` out of the service account's accessible resources.
+   */
   baseUrl: string;
   /** Project key new issues are created under, e.g. "SEC". */
   projectKey: string;
   /** Issue type name, e.g. "Task" / "Incident" (default "Task"). */
   issueType: string;
-  /** Jira account email for basic auth (paired with an API token). */
-  email: string;
-  /** Jira API token (basic-auth password). Kept out of logs. */
-  apiToken: string;
   /**
    * Transition NAME to move the issue to on a ticket resolution, e.g. "Done".
    * Matched case-insensitively against the issue's available transitions. Unset
    * skips the transition (a resolution comment is still added).
    */
   resolvedTransition?: string;
+  auth: JiraAuth;
 }
 
 /** Error carrying the upstream Jira HTTP status so the caller can decide to retry. */
@@ -90,10 +115,19 @@ export function parseJiraTargets(env: Env): Map<number, JiraTarget> {
     // trailing slashes — this config is external input, so avoid the ReDoS pattern).
     const baseUrl = stripTrailingSlashes(strField(o, "baseUrl"));
     const projectKey = strField(o, "projectKey");
+
+    // Two auth shapes can appear on one entry; `basic` is checked first only as a
+    // tie-break if both are somehow fully present — pick one mode per client.
     const email = strField(o, "email");
     const apiToken = typeof o.apiToken === "string" ? o.apiToken : "";
-    if (!Number.isFinite(clientId) || !baseUrl || !projectKey || !email || !apiToken) {
-      // Log the client id only (never the token) so a misconfig is visible but safe.
+    const oauthClientId = strField(o, "oauthClientId");
+    const oauthClientSecret = typeof o.oauthClientSecret === "string" ? o.oauthClientSecret : "";
+    let auth: JiraAuth | null = null;
+    if (email && apiToken) auth = { mode: "basic", email, apiToken };
+    else if (oauthClientId && oauthClientSecret) auth = { mode: "oauth", oauthClientId, oauthClientSecret };
+
+    if (!Number.isFinite(clientId) || !baseUrl || !projectKey || !auth) {
+      // Log the client id only (never the token/secret) so a misconfig is visible but safe.
       breadcrumb(`JIRA_TARGETS entry skipped (missing field) clientId=${o.clientId ?? "?"}`);
       continue;
     }
@@ -102,9 +136,8 @@ export function parseJiraTargets(env: Env): Map<number, JiraTarget> {
       baseUrl,
       projectKey,
       issueType: strField(o, "issueType") || "Task",
-      email,
-      apiToken,
       resolvedTransition: strField(o, "resolvedTransition") || undefined,
+      auth,
     });
   }
   return out;
@@ -140,25 +173,117 @@ export interface JiraIssueInput {
   labels?: string[];
 }
 
+const OAUTH_TOKEN_URL = "https://auth.atlassian.com/oauth/token";
+const ACCESSIBLE_RESOURCES_URL = "https://api.atlassian.com/oauth/token/accessible-resources";
+// Refresh this many ms before the token's real expiry so a request never races it.
+const OAUTH_REFRESH_SKEW_MS = 60_000;
+
 /**
  * Thin, dependency-free Jira Cloud REST client, scoped to one target. Mirrors the
- * discipline of GoreloClient: keeps the API token out of logs (Authorization is
- * never logged) and backs off on 429/5xx using the shared retryDelayMs schedule.
+ * discipline of GoreloClient: keeps credentials out of logs (Authorization is never
+ * logged) and backs off on 429/5xx using the shared retryDelayMs schedule.
+ *
+ * In `oauth` mode the access token and resolved `cloudId` are cached on the instance
+ * (not across requests/invocations — Workers give no such guarantee) so one create-then-
+ * close sequence within the same fan-out only pays the token/cloudId lookup once.
  */
 export class JiraClient {
+  private accessToken?: string;
+  private accessTokenExpiresAt = 0; // epoch ms
+  private cloudId?: string;
+
   constructor(private readonly target: JiraTarget) {}
 
-  private authHeader(): string {
-    // btoa is available in the Workers runtime. email:token is the Jira Cloud
-    // basic-auth credential; never logged.
-    return `Basic ${btoa(`${this.target.email}:${this.target.apiToken}`)}`;
+  /**
+   * client_credentials exchange for an `oauth`-mode target — true machine-to-machine
+   * auth (no redirect/consent), specific to Atlassian service-account OAuth 2.0
+   * credentials. Cached until `OAUTH_REFRESH_SKEW_MS` before the real expiry.
+   */
+  private async ensureAccessToken(): Promise<string> {
+    if (this.target.auth.mode !== "oauth") {
+      throw new Error("ensureAccessToken called on a non-oauth Jira target");
+    }
+    const now = Date.now();
+    if (this.accessToken && now < this.accessTokenExpiresAt) return this.accessToken;
+
+    const { oauthClientId, oauthClientSecret } = this.target.auth;
+    const res = await fetch(OAUTH_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        client_id: oauthClientId,
+        client_secret: oauthClientSecret,
+      }),
+    });
+    const text = await res.text().catch(() => "");
+    if (!res.ok) throw new JiraError("Jira OAuth token request failed", res.status, text);
+    let parsed: { access_token?: string; expires_in?: number };
+    try {
+      parsed = JSON.parse(text) as { access_token?: string; expires_in?: number };
+    } catch {
+      throw new JiraError("Jira OAuth token response was not JSON", res.status, text);
+    }
+    if (!parsed.access_token) throw new JiraError("Jira OAuth token response carried no access_token", res.status, text);
+
+    this.accessToken = parsed.access_token;
+    const ttlMs = (parsed.expires_in ?? 3600) * 1000;
+    this.accessTokenExpiresAt = now + Math.max(ttlMs - OAUTH_REFRESH_SKEW_MS, 0);
+    return this.accessToken;
+  }
+
+  /**
+   * `oauth`-mode requests go through `api.atlassian.com/ex/jira/{cloudId}`, not the
+   * site directly — resolve which accessible resource matches this target's `baseUrl`
+   * (the service account's OAuth credential may have scopes on several sites).
+   */
+  private async resolveCloudId(): Promise<string> {
+    if (this.cloudId) return this.cloudId;
+    const token = await this.ensureAccessToken();
+    const res = await fetch(ACCESSIBLE_RESOURCES_URL, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    const text = await res.text().catch(() => "");
+    if (!res.ok) throw new JiraError("Jira accessible-resources lookup failed", res.status, text);
+    let resources: Array<{ id?: string; url?: string }>;
+    try {
+      resources = JSON.parse(text) as Array<{ id?: string; url?: string }>;
+    } catch {
+      throw new JiraError("Jira accessible-resources response was not JSON", res.status, text);
+    }
+    const wanted = stripTrailingSlashes(this.target.baseUrl).toLowerCase();
+    const match = resources.find((r) => stripTrailingSlashes(r.url ?? "").toLowerCase() === wanted);
+    if (!match?.id) {
+      throw new JiraError(
+        `service account has no access to ${this.target.baseUrl} (check its OAuth credential's site scopes)`,
+        res.status,
+        text,
+      );
+    }
+    this.cloudId = match.id;
+    return this.cloudId;
+  }
+
+  private async authHeader(): Promise<string> {
+    if (this.target.auth.mode === "basic") {
+      // btoa is available in the Workers runtime. email:token is the Jira Cloud
+      // basic-auth credential; never logged.
+      const { email, apiToken } = this.target.auth;
+      return `Basic ${btoa(`${email}:${apiToken}`)}`;
+    }
+    return `Bearer ${await this.ensureAccessToken()}`;
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
-    return fetch(`${this.target.baseUrl}${path}`, {
+    // Sequential, not Promise.all: authHeader() warms the oauth token cache first,
+    // so the resolveCloudId() inside baseUrl() below reuses it instead of racing a
+    // second concurrent token fetch.
+    const auth = await this.authHeader();
+    const base = this.target.auth.mode === "basic" ? this.target.baseUrl : `https://api.atlassian.com/ex/jira/${await this.resolveCloudId()}`;
+    return fetch(`${base}${path}`, {
       ...init,
       headers: {
-        Authorization: this.authHeader(),
+        Authorization: auth,
         Accept: "application/json",
         ...(init?.headers ?? {}),
       },

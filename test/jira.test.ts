@@ -37,6 +37,7 @@ describe("parseJiraTargets", () => {
     expect(t.projectKey).toBe("SEC");
     expect(t.issueType).toBe("Task"); // defaulted
     expect(t.resolvedTransition).toBe("Done");
+    expect(t.auth).toEqual({ mode: "basic", email: "svc@acme.com", apiToken: "tok" });
   });
 
   it("skips entries missing a required field but keeps the valid ones", () => {
@@ -49,6 +50,31 @@ describe("parseJiraTargets", () => {
     expect(m.has(1)).toBe(false);
     expect(m.has(2)).toBe(false);
     expect(m.has(3)).toBe(true);
+  });
+
+  it("recognizes a service-account OAuth 2.0 credential (oauthClientId + oauthClientSecret) as an alternative to email/apiToken", () => {
+    const raw = JSON.stringify([
+      {
+        clientId: 20,
+        baseUrl: "https://acme.atlassian.net",
+        projectKey: "SEC",
+        oauthClientId: "oauth-id",
+        oauthClientSecret: "oauth-secret",
+      },
+    ]);
+    const m = parseJiraTargets(mkEnv({ JIRA_TARGETS: raw }));
+    const t = m.get(20)!;
+    expect(t.auth).toEqual({ mode: "oauth", oauthClientId: "oauth-id", oauthClientSecret: "oauth-secret" });
+  });
+
+  it("skips an entry with neither auth shape complete, even with an unrelated field set", () => {
+    const raw = JSON.stringify([
+      { clientId: 30, baseUrl: "https://x.atlassian.net", projectKey: "P", email: "e@x.com" }, // no token, no oauth secret either
+      { clientId: 31, baseUrl: "https://x.atlassian.net", projectKey: "P", oauthClientId: "id-only" }, // no secret
+    ]);
+    const m = parseJiraTargets(mkEnv({ JIRA_TARGETS: raw }));
+    expect(m.has(30)).toBe(false);
+    expect(m.has(31)).toBe(false);
   });
 
   it("returns an empty map for unset / malformed / non-array input", () => {
