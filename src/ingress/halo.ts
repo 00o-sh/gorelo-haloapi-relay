@@ -674,19 +674,21 @@ function originalTicketRef(original: CreatedTicketRow): string {
 }
 
 /**
- * Rewrite a build command into a Huntress-resolution notice: a clear banner naming
- * the original ticket (which the upstream Gorelo API can't close programmatically),
- * a "Resolved:" title, the resolved status, and no auto-email. Mutates `cmd`.
+ * Rewrite a build command into a Huntress-resolution FALLBACK notice — used only when
+ * handleResolution's primary path (directly updating the original ticket via PATCH)
+ * fails, so a resolution is never silently dropped: a clear banner naming the
+ * original ticket, a "Resolved:" title, the resolved status, and no auto-email.
+ * Mutates `cmd`.
  */
 function asResolutionNotice(env: Env, cmd: CreatePublicTicketCommand, original: CreatedTicketRow): void {
   const ref = originalTicketRef(original);
   const banner =
     `${heading("Huntress incident resolved")}<br>` +
     `Huntress marked this incident resolved and set the source ticket to its ` +
-    `post-resolution status.<br>` +
-    `Original ticket: ${esc(ref)}${original.title ? ` — ${esc(original.title)}` : ""}<br>` +
-    `The upstream ticket system has no update API, so the original ticket must be ` +
-    `closed manually.`;
+    `post-resolution status, but the relay could not update the original ticket ` +
+    `directly (see the Worker logs) — filing this notice instead so the ` +
+    `resolution isn't lost.<br>` +
+    `Original ticket: ${esc(ref)}${original.title ? ` — ${esc(original.title)}` : ""}`;
   cmd.title = original.title ? `Resolved: ${original.title}` : `Resolved: ${cmd.title}`;
   cmd.description = `${banner}<br><br>${cmd.description}`;
   cmd.statusId = resolvedStatusId(env);
@@ -695,6 +697,14 @@ function asResolutionNotice(env: Env, cmd: CreatePublicTicketCommand, original: 
   // edit rarely carries routing fields, so without this it would fall to the catch-all.
   if (original.client_id) cmd.clientId = original.client_id;
   if (original.contact_id) cmd.contactId = original.contact_id;
+}
+
+/** The comment posted on the original Gorelo ticket when it's resolved directly (primary path). */
+function resolutionCommentHtml(): string {
+  return (
+    `${heading("Huntress incident resolved")}<br>` +
+    `Huntress marked this incident resolved and set the source ticket to its post-resolution status.`
+  );
 }
 
 /**
@@ -950,9 +960,13 @@ async function handleCreateTicket(
 
 /**
  * A Huntress resolution edit of an existing ticket (POST /Tickets carrying a
- * ledger-known id). The Gorelo API can't update the original, so we file a labeled
- * resolution ticket in a resolved status, mark the original resolved in our ledger,
- * and echo the original id back as resolved so Huntress sees its edit succeed.
+ * ledger-known id). Resolves the original Gorelo ticket **directly** via
+ * `PATCH /v1/tickets/{id}` (added to the Gorelo API after this relay's original
+ * "create-only" assumption was written) and posts a resolution comment on it. Only
+ * if that fails (or no `gorelo_id` is on record) does it fall back to the old
+ * behavior — filing a clearly-labeled "Resolved: …" notice ticket — so a resolution
+ * is never silently dropped. Marks the original resolved in our ledger either way,
+ * and echoes the original id back as resolved so Huntress sees its edit succeed.
  */
 async function handleResolution(
   env: Env,
@@ -962,28 +976,50 @@ async function handleResolution(
   original: CreatedTicketRow,
   product: Product | null,
 ): Promise<Response> {
-  asResolutionNotice(env, cmd, original);
-  const rid = cmd.statusId;
+  const rid = resolvedStatusId(env);
+  let resolvedDirectly = false;
 
-  // File the resolution notice in Gorelo (best-effort; on failure queue for retry so
-  // the orphan flush picks it up, same resilience as the normal create path).
-  const noticeId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
-  try {
-    const client = new GoreloClient(env);
-    const raw = await client.createTicket(cmd);
-    const goreloId = extractTicketNumber(raw) ?? "";
-    const number = await client.resolveTicketNumber(goreloId);
-    await recordCreatedTicket(env, number?.number ?? noticeId, goreloId, number, cmd);
-    breadcrumb(
-      `HALO resolution notice for original halo_id=${original.halo_id} filed as gorelo ${goreloId} ` +
-        `(${numberTag(number)} status=${rid})`,
-    );
-  } catch (err) {
-    await putPendingTicket(env.DB, noticeId, JSON.stringify(cmd), nowIso());
-    breadcrumb(
-      `HALO resolution notice create failed for original halo_id=${original.halo_id}, ` +
-        `queued for retry: ${describeError(err)}`,
-    );
+  if (original.gorelo_id) {
+    try {
+      const client = new GoreloClient(env);
+      await client.updateTicket(original.gorelo_id, { statusId: rid });
+      resolvedDirectly = true;
+      breadcrumb(
+        `HALO resolved gorelo ticket ${original.gorelo_id} directly (halo_id=${original.halo_id} status=${rid})`,
+      );
+      // The status change already landed; a failed comment isn't worth losing that over.
+      await client.addTicketComment(original.gorelo_id, resolutionCommentHtml()).catch((err) => {
+        breadcrumb(`HALO resolution comment failed gorelo_id=${original.gorelo_id}: ${describeError(err)}`);
+      });
+    } catch (err) {
+      breadcrumb(
+        `HALO direct resolution update failed for gorelo_id=${original.gorelo_id} halo_id=${original.halo_id}, ` +
+          `falling back to a labeled notice ticket: ${describeError(err)}`,
+      );
+    }
+  }
+
+  // Fallback (old behavior): no gorelo_id on record, or the direct update failed.
+  if (!resolvedDirectly) {
+    asResolutionNotice(env, cmd, original);
+    const noticeId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
+    try {
+      const client = new GoreloClient(env);
+      const raw = await client.createTicket(cmd);
+      const goreloId = extractTicketNumber(raw) ?? "";
+      const number = await client.resolveTicketNumber(goreloId);
+      await recordCreatedTicket(env, number?.number ?? noticeId, goreloId, number, cmd);
+      breadcrumb(
+        `HALO resolution notice for original halo_id=${original.halo_id} filed as gorelo ${goreloId} ` +
+          `(${numberTag(number)} status=${rid})`,
+      );
+    } catch (err) {
+      await putPendingTicket(env.DB, noticeId, JSON.stringify(cmd), nowIso());
+      breadcrumb(
+        `HALO resolution notice create failed for original halo_id=${original.halo_id}, ` +
+          `queued for retry: ${describeError(err)}`,
+      );
+    }
   }
 
   // Mark the original resolved in our ledger (upsert with the resolved status) so a

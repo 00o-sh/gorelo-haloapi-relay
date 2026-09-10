@@ -204,6 +204,24 @@ export interface CreatePublicTicketResult {
 }
 
 /**
+ * PATCH /v1/tickets/{ticketId} body (added to the Gorelo API after this relay's
+ * original "no update endpoint" assumption was written — see README "Huntress
+ * resolutions"). A genuine partial update: only send the fields you want to change.
+ * The relay only ever sets `statusId` (closing the original ticket on a resolution);
+ * see `public-cluster_UpdatePublicTicketCommand` in docs/gorelo-swagger.v1.json for
+ * the full field set if more become needed.
+ */
+export interface UpdatePublicTicketCommand {
+  statusId?: number;
+}
+
+/** POST /v1/tickets/{ticketId}/comments body. `conversationTypeId` 1 = Public (the ticket's main thread) — the only value the relay sends. */
+export interface CreatePublicCommentCommand {
+  conversationTypeId: number;
+  body: string; // HTML
+}
+
+/**
  * GET /v1/tickets item (subset of PublicTicketListItemModel actually read here).
  * `id` is the ticket GUID (matches the create response); `number` is the numeric
  * ticket number and `displayNumber` its formatted form — the human-facing values.

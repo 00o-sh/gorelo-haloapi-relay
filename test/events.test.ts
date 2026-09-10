@@ -65,6 +65,15 @@ function captureGoreloCreate(
     match: (u) => u.pathname === "/v1/tickets",
     handler: () => json(200, { data: [{ id: uuid, number, displayNumber }], hasMore: false }),
   });
+  // The resolution path resolves the original ticket directly (PATCH + a comment) —
+  // this spec only cares about the emitted TicketResolvedEvent, not these calls'
+  // wire shape (see test/halo.test.ts for that), so a bare 200 is enough.
+  routes.push({ method: "PATCH", match: (u) => /^\/v1\/tickets\/[^/]+$/.test(u.pathname), handler: () => json(200, { id: uuid }) });
+  routes.push({
+    method: "POST",
+    match: (u) => /^\/v1\/tickets\/[^/]+\/comments$/.test(u.pathname),
+    handler: () => json(200, { id: "comment-uuid" }),
+  });
 }
 
 async function seed(): Promise<void> {
