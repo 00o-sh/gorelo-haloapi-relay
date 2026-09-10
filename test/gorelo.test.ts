@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { GoreloClient, clampPageSize, extractTicketNumber, firstNotificationCode, retryDelayMs } from "../src/gorelo.js";
-import type { CreatePublicTicketCommand, Env } from "../src/types.js";
+import { GoreloClient, clampPageSize, extractTicketNumber, firstNotificationCode, retryDelayMs } from "../src/core/gorelo.js";
+import type { CreatePublicTicketCommand, Env } from "../src/core/types.js";
 
 describe("extractTicketNumber", () => {
   it("reads the live create-response `id` field", () => {

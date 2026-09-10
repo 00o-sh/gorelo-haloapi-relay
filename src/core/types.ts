@@ -56,6 +56,11 @@ export interface Env {
   // catch-all/no-contact fallback. Any other value (or unset) suppresses it.
   SEND_TICKET_CREATED_EMAIL?: string;
   DEBUG_LOGS?: string; // "true" enables verbose HALO CAPTURE/RESPONSE body logging (PII)
+  // Egress Jira fan-out for co-managed clients (see src/egress/jira/). Master switch:
+  // "true" (also "1"/"yes"/"on") turns on the ticket→Jira fan-out; unset/anything else
+  // leaves it off. Enrollment is still per-client via JIRA_TARGETS, so a client with no
+  // target entry is never sent to Jira even when this is on.
+  ENABLE_JIRA?: string; // "true" | "false" (default false)
   // Master on/off for the Sentry error monitor (src/index.ts). OFF by default —
   // Sentry sends NOTHING (no events, no spans, no egress) unless this is explicitly
   // truthy ("true"/"1"/"yes"/"on"). Production opts in via wrangler.toml [vars];
@@ -92,6 +97,15 @@ export interface Env {
   // Optional notifly (Apprise-style) URLs alerted when a ticket is dead-lettered.
   // Comma/space/newline separated, e.g. "ntfy://alerts, msteams://…, slack://…".
   NOTIFLY_URLS?: string;
+  // Per-client Jira Cloud destinations for the egress Jira fan-out (co-managed
+  // clients). A JSON array (kept in a Worker secret — it holds API tokens), one entry
+  // per enrolled Gorelo client; a client is sent to Jira exactly when it has an entry
+  // here (and ENABLE_JIRA is on). Shape (see JiraTarget in src/egress/jira/):
+  //   [{ "clientId": 15567, "baseUrl": "https://acme.atlassian.net",
+  //      "projectKey": "SEC", "issueType": "Task", "email": "svc@acme.com",
+  //      "apiToken": "…", "resolvedTransition": "Done" }]
+  // Set via `wrangler secret put JIRA_TARGETS`; never commit it to wrangler.toml.
+  JIRA_TARGETS?: string;
   // Shared secret for the `default` alert source (POST /v1/alerts). Accepted as
   // `Authorization: Bearer <secret>` (preferred) or `X-Alert-Key: <secret>`; valid only
   // from an ALERT_ALLOWED_IPS address. Unset => the default source can't authenticate.

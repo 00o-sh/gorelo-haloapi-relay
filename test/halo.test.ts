@@ -1,10 +1,10 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import worker from "../src/index.js";
-import { flushPendingTickets, haloResource, isHaloPath, isHaloRequest } from "../src/halo.js";
-import { initSchema } from "../src/db.js";
-import { assetNum } from "../src/sync.js";
-import { signToken } from "../src/token.js";
+import { flushPendingTickets, haloResource, isHaloPath, isHaloRequest } from "../src/ingress/halo.js";
+import { initSchema } from "../src/core/db.js";
+import { assetNum } from "../src/ingress/sync.js";
+import { signToken } from "../src/core/token.js";
 
 const HOST = "https://t2t.example.com";
 const AGENT_UUID = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
