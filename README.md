@@ -379,15 +379,18 @@ grace window later. Submitter name and body heading are product-aware (Huntress 
 
 **Huntress resolutions.** Huntress signals an incident resolution by **editing the
 original ticket** (a `POST /Tickets` carrying its `id`) to its configured *"Status after
-Huntress Resolution"*. Gorelo has **no ticket-update endpoint** (`POST`/`GET` only — no
-`PUT`/`PATCH`, no `/v1/tickets/{id}`), so the relay can't mutate the original Gorelo
-ticket. Instead, when an incoming `POST /tickets` carries an `id` that matches a row in
-the `created_tickets` ledger (a ticket **we** issued — a brand-new alert never does, so a
-real alert can't be misread as a resolution), the relay files a **clearly-labeled
-resolution notice** in Gorelo — a `Resolved: …` ticket that names the original and lands
-in `DEFAULT_RESOLVED_STATUS_ID` (falls back to `DEFAULT_STATUS_ID` when unset) — marks the
-original resolved in the ledger, and echoes the original id back as resolved. The original
-Gorelo ticket must still be **closed manually** (the notice says so), since the API can't.
+Huntress Resolution"*. When an incoming `POST /tickets` carries an `id` that matches a
+row in the `created_tickets` ledger (a ticket **we** issued — a brand-new alert never
+does, so a real alert can't be misread as a resolution), the relay **closes the original
+ticket directly**: `PATCH /v1/tickets/{id}` to `DEFAULT_RESOLVED_STATUS_ID` (falls back
+to `DEFAULT_STATUS_ID` when unset), then `POST /v1/tickets/{id}/comments` with a short
+resolution note — both added to the Gorelo API after this relay's original
+"create-only" assumption was written (confirmed live 2026-09-10; `GoreloClient.
+updateTicket`/`addTicketComment`). Marks the original resolved in the ledger and echoes
+the original id back as resolved. If the direct `PATCH` fails, or the ledger row somehow
+carries no `gorelo_id`, the relay falls back to the **old behavior** — filing a
+clearly-labeled `Resolved: …` notice ticket naming the original — so a resolution is
+never silently dropped.
 
 > **Note — Tier2 was previously a deferred two-step** (`/tickets` queued, `/actions`
 > folded the HDB "View Report" link in before creating). It's now eager so the
