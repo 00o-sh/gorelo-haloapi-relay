@@ -4,7 +4,7 @@ import worker from "../src/index.js";
 import { initSchema, getCreatedTicket, putCreatedTicket, putPendingJira } from "../src/core/db.js";
 import { clearSubscribers, registerSubscriber } from "../src/core/events.js";
 import { assetNum } from "../src/ingress/sync.js";
-import { flushPendingJira, jiraSubscriber } from "../src/egress/jira/index.js";
+import { flushPendingJira, jiraSubscriber, JiraClient, JiraError, type JiraTarget } from "../src/egress/jira/index.js";
 
 // Integration coverage for the Jira egress path on the event spine:
 //  - subscriber wiring: an enrolled client's ticket create -> Jira issue + ledger key
@@ -25,6 +25,10 @@ const AGENT_UUID = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
 const ASSET_NUM = assetNum(AGENT_UUID);
 const TIER2_IP = "34.202.14.153";
 const JIRA_HOST = "acme.atlassian.net";
+// basic-mode requests never hit JIRA_HOST directly (see JiraClient.resolveCloudId) —
+// they resolve this cloudId via an unauthenticated GET {baseUrl}/_edge/tenant_info,
+// then call api.atlassian.com/ex/jira/{JIRA_CLOUD_ID}/... like oauth mode does.
+const JIRA_CLOUD_ID = "acme-cloud-id";
 const TARGETS = JSON.stringify([
   {
     clientId: 10,
@@ -55,6 +59,12 @@ function installFetch(): void {
     if (req.method === "GET" && /^\/v1\/assets\/agents\//.test(url.pathname)) {
       return new Response("", { status: 404 });
     }
+    // Basic-mode JiraClient resolves its cloudId via this unauthenticated lookup
+    // before every request (see resolveCloudId) — stub it for every test rather
+    // than per-test, since it's not what any test is actually exercising.
+    if (req.method === "GET" && url.host === JIRA_HOST && url.pathname === "/_edge/tenant_info") {
+      return json(200, { cloudId: JIRA_CLOUD_ID });
+    }
     throw new Error(`unmocked fetch: ${req.method} ${req.url}`);
   }) as typeof fetch;
 }
@@ -79,7 +89,7 @@ function captureJiraCreate(key = "SEC-1"): { calls: () => Array<Record<string, u
   const seen: Array<Record<string, unknown>> = [];
   routes.push({
     method: "POST",
-    match: (u) => u.host === JIRA_HOST && u.pathname === "/rest/api/3/issue",
+    match: (u) => u.host === "api.atlassian.com" && u.pathname === `/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue`,
     handler: async (r) => {
       seen.push((await r.json()) as Record<string, unknown>);
       return json(201, { id: "10001", key });
@@ -94,7 +104,7 @@ function captureJiraClose(): { comments: () => string[]; transitioned: () => str
   const transitioned: string[] = [];
   routes.push({
     method: "POST",
-    match: (u) => u.host === JIRA_HOST && /\/rest\/api\/3\/issue\/[^/]+\/comment$/.test(u.pathname),
+    match: (u) => u.host === "api.atlassian.com" && new RegExp(`^/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/[^/]+/comment$`).test(u.pathname),
     handler: (r) => {
       comments.push(new URL(r.url).pathname);
       return json(201, {});
@@ -102,12 +112,12 @@ function captureJiraClose(): { comments: () => string[]; transitioned: () => str
   });
   routes.push({
     method: "GET",
-    match: (u) => u.host === JIRA_HOST && /\/transitions$/.test(u.pathname),
+    match: (u) => u.host === "api.atlassian.com" && new RegExp(`^/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/[^/]+/transitions$`).test(u.pathname),
     handler: () => json(200, { transitions: [{ id: "31", name: "Done" }] }),
   });
   routes.push({
     method: "POST",
-    match: (u) => u.host === JIRA_HOST && /\/transitions$/.test(u.pathname),
+    match: (u) => u.host === "api.atlassian.com" && new RegExp(`^/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/[^/]+/transitions$`).test(u.pathname),
     handler: (r) => {
       transitioned.push(new URL(r.url).pathname);
       return new Response(null, { status: 204 });
@@ -327,7 +337,7 @@ describe("Jira egress — durable pending_jira drain (flushPendingJira)", () => 
     // Jira create always fails.
     routes.push({
       method: "POST",
-      match: (u) => u.host === JIRA_HOST && u.pathname === "/rest/api/3/issue",
+      match: (u) => u.host === "api.atlassian.com" && u.pathname === `/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue`,
       handler: () => json(400, { errorMessages: ["bad"] }),
     });
     // Capture the notifly dead-letter alert (jsons:// -> POST hooks.example.com).
@@ -357,5 +367,120 @@ describe("Jira egress — durable pending_jira drain (flushPendingJira)", () => 
     // notifly alerted, naming the client and action.
     expect(String(alert?.title)).toContain("Jira create failed");
     expect(String(alert?.body)).toContain("Client (Gorelo id): 10");
+  });
+});
+
+// Drives JiraClient directly (not through the worker/event spine — that wiring is
+// auth-mode-agnostic and already covered above) against the client_credentials +
+// accessible-resources + api.atlassian.com/ex/jira/{cloudId} shape a service
+// account's OAuth 2.0 credential uses (see README "Jira output (egress)").
+describe("Jira egress — service-account OAuth 2.0 auth mode", () => {
+  const CLOUD_ID = "11111111-2222-3333-4444-555555555555";
+  const OAUTH_TARGET: JiraTarget = {
+    clientId: 10,
+    baseUrl: `https://${JIRA_HOST}`,
+    projectKey: "SEC",
+    issueType: "Task",
+    resolvedTransition: "Done",
+    auth: { mode: "oauth", oauthClientId: "oauth-id", oauthClientSecret: "oauth-secret" },
+  };
+
+  function mockOAuthToken(): { calls: () => number } {
+    let calls = 0;
+    routes.push({
+      method: "POST",
+      match: (u) => u.host === "auth.atlassian.com" && u.pathname === "/oauth/token",
+      handler: async (r) => {
+        calls++;
+        const body = (await r.json()) as Record<string, unknown>;
+        expect(body.grant_type).toBe("client_credentials");
+        expect(body.client_id).toBe("oauth-id");
+        expect(body.client_secret).toBe("oauth-secret");
+        return json(200, { access_token: "fake-access-token", expires_in: 3600 });
+      },
+    });
+    return { calls: () => calls };
+  }
+
+  function mockAccessibleResources(resources: Array<{ id: string; url: string }>): { calls: () => number } {
+    let calls = 0;
+    routes.push({
+      method: "GET",
+      match: (u) => u.host === "api.atlassian.com" && u.pathname === "/oauth/token/accessible-resources",
+      handler: (r) => {
+        calls++;
+        expect(r.headers.get("authorization")).toBe("Bearer fake-access-token");
+        return json(200, resources);
+      },
+    });
+    return { calls: () => calls };
+  }
+
+  it("exchanges client_credentials for a token, resolves cloudId, and creates against api.atlassian.com/ex/jira/{cloudId}", async () => {
+    const token = mockOAuthToken();
+    const resources = mockAccessibleResources([
+      { id: CLOUD_ID, url: `https://${JIRA_HOST}` },
+      { id: "other-cloud-id", url: "https://other.atlassian.net" },
+    ]);
+    const seen: Array<{ fields?: Record<string, unknown> }> = [];
+    routes.push({
+      method: "POST",
+      match: (u) => u.host === "api.atlassian.com" && u.pathname === `/ex/jira/${CLOUD_ID}/rest/api/3/issue`,
+      handler: async (r) => {
+        seen.push((await r.json()) as { fields?: Record<string, unknown> });
+        return json(201, { id: "10001", key: "SEC-9" });
+      },
+    });
+
+    const key = await new JiraClient(OAUTH_TARGET).createIssue({ summary: "OAuth test", description: "body" });
+    expect(key).toBe("SEC-9");
+    expect(token.calls()).toBe(1);
+    expect(resources.calls()).toBe(1);
+    expect(seen[0]?.fields?.project).toEqual({ key: "SEC" });
+  });
+
+  it("caches the token and cloudId across calls on one instance (create, comment, transition = one token fetch)", async () => {
+    const token = mockOAuthToken();
+    const resources = mockAccessibleResources([{ id: CLOUD_ID, url: `https://${JIRA_HOST}` }]);
+    routes.push({
+      method: "POST",
+      match: (u) => u.host === "api.atlassian.com" && u.pathname === `/ex/jira/${CLOUD_ID}/rest/api/3/issue`,
+      handler: () => json(201, { id: "10001", key: "SEC-9" }),
+    });
+    routes.push({
+      method: "POST",
+      match: (u) => u.host === "api.atlassian.com" && /\/comment$/.test(u.pathname),
+      handler: () => json(201, {}),
+    });
+    routes.push({
+      method: "GET",
+      match: (u) => u.host === "api.atlassian.com" && /\/transitions$/.test(u.pathname),
+      handler: () => json(200, { transitions: [{ id: "31", name: "Done" }] }),
+    });
+    routes.push({
+      method: "POST",
+      match: (u) => u.host === "api.atlassian.com" && /\/transitions$/.test(u.pathname),
+      handler: () => new Response(null, { status: 204 }),
+    });
+
+    const client = new JiraClient(OAUTH_TARGET);
+    const key = await client.createIssue({ summary: "s", description: "d" });
+    await client.addComment(key, "resolved");
+    const transitioned = await client.transitionTo(key, "done"); // case-insensitive vs "Done"
+
+    expect(transitioned).toBe(true);
+    // One token fetch + one cloudId lookup for the whole create+comment+transition
+    // sequence, not one per call — see the instance-level cache in JiraClient.
+    expect(token.calls()).toBe(1);
+    expect(resources.calls()).toBe(1);
+  });
+
+  it("throws a JiraError when the service account's OAuth credential has no access to this target's site", async () => {
+    mockOAuthToken();
+    mockAccessibleResources([{ id: "other-cloud-id", url: "https://other.atlassian.net" }]); // no match for JIRA_HOST
+
+    await expect(
+      new JiraClient(OAUTH_TARGET).createIssue({ summary: "s", description: "d" }),
+    ).rejects.toThrow(JiraError);
   });
 });

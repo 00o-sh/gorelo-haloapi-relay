@@ -741,34 +741,81 @@ ENABLE_JIRA = "true"
 ```bash
 # secret — one entry per ENROLLED Gorelo client (a client with no entry is never sent)
 wrangler secret put JIRA_TARGETS
-# [{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC",
-#   "issueType":"Task","email":"svc@acme.com","apiToken":"…","resolvedTransition":"Done"}]
 ```
+
+**Use a dedicated Atlassian [service account](https://support.atlassian.com/user-management/docs/understand-service-accounts/)
+for the credential in every entry below — never a real employee's personal login.**
+A service account has no password, isn't tied to anyone leaving, and doesn't count
+against the site's user-license seats. Create one in Atlassian Administration →
+Directory → Service accounts. Each `JIRA_TARGETS` entry picks **one** of two auth modes:
+
+- **`email` + `apiToken`** (Basic auth, simplest) — a token generated for the service
+  account at Atlassian Administration → Directory → Service accounts → the account →
+  Create credentials → API token (or at id.atlassian.com while logged in *as* the
+  service account).
+  ```json
+  [{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC",
+    "issueType":"Task","email":"svc@acme.com","apiToken":"…","resolvedTransition":"Done"}]
+  ```
+- **`oauthClientId` + `oauthClientSecret`** (OAuth 2.0, machine-to-machine) — from the
+  same service account: Create credentials → OAuth 2.0 → select Jira scopes
+  (`read:jira-work` + `write:jira-work` cover create/comment/transition). No
+  redirect/consent step — `JiraClient` exchanges these via `client_credentials` at
+  `auth.atlassian.com`, caching the resulting bearer token per instance.
+  ```json
+  [{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC",
+    "issueType":"Task","oauthClientId":"…","oauthClientSecret":"…","resolvedTransition":"Done"}]
+  ```
+
+`baseUrl` is required either way, but **neither mode calls it directly** — every
+request goes through `api.atlassian.com/ex/jira/{cloudId}/...`, with `cloudId`
+resolved once per `JiraClient` instance (`baseUrl` is only used to look it up: via
+the OAuth token's accessible-resources in `oauth` mode, or an unauthenticated
+`{baseUrl}/_edge/tenant_info` lookup in `basic` mode). This matters because
+Atlassian's own token-creation UI increasingly steers you toward **scoped** API
+tokens (pick specific scopes, same page as `oauthClientId`/`oauthClientSecret`
+above) — a scoped token returns a misleading "project doesn't exist or you don't
+have permission" error if called against the site directly, but works fine through
+the gateway. A classic (unscoped) token works through the gateway too, so `basic`
+mode always routes this way regardless of which kind of token you generated.
 
 ### Testing against a free Jira Cloud site (no production Jira needed)
 
 1. Create a free Jira Cloud site at <https://www.atlassian.com/software/jira/free>
    (`https://<you>.atlassian.net`) and a project (note its **project key**, e.g. `SEC`).
-2. Create an API token at <https://id.atlassian.com/manage-profile/security/api-tokens>.
+2. Create a service account for the site (Atlassian Administration → Directory →
+   Service accounts), then a credential for it — an API token, or an OAuth 2.0
+   credential scoped to `read:jira-work`/`write:jira-work` (see above).
 3. Point `JIRA_TARGETS` at that site, keyed by a **Gorelo `clientId` you can trigger a
-   ticket for**: `baseUrl` = your site URL, `projectKey` = your project, `email` = your
-   Atlassian login, `apiToken` = the token, `issueType` = a type your project has (e.g.
-   `Task`), `resolvedTransition` = a transition name from your workflow (e.g. `Done`).
-   Set `ENABLE_JIRA="true"`.
+   ticket for**: `baseUrl` = your site URL, `projectKey` = your project, the auth fields
+   from step 2, `issueType` = a type your project has (e.g. `Task`), `resolvedTransition`
+   = a transition name from your workflow (e.g. `Done`). Set `ENABLE_JIRA="true"`.
 4. Drive a ticket for that client (a Tier2 press / Huntress alert, or a create in `wrangler
    dev`) → a Jira issue should appear, labelled with the product key + `gorelo-<number>`.
    Resolve it (Huntress resolution edit) → the issue gets a resolution comment and, if the
    `resolvedTransition` matches an available transition, moves to that status.
 
-The three Jira REST calls the fan-out makes — and which are still **only mock-verified**
-(the automated tests stub every Jira request) and need a live site to confirm the real
-API accepts our bodies:
+The three Jira REST calls the fan-out makes, and their live-verification status —
+**both auth modes** have now been driven end to end against a real Jira Cloud site
+(create → resolve → comment + transition), not just the mocked test suite:
 
-| Call | Jira endpoint | Verified by tests | Needs live check |
+| Call | Jira endpoint | Verified by tests | Live-verified |
 |---|---|---|---|
-| Create issue | `POST /rest/api/3/issue` (ADF description) | mock only | ✅ yes |
-| Add comment | `POST /rest/api/3/issue/{key}/comment` (ADF body) | mock only | ✅ yes |
-| Transition | `GET` + `POST /rest/api/3/issue/{key}/transitions` | mock only | ✅ yes |
+| Create issue | `POST /rest/api/3/issue` (ADF description) | mocked (both auth modes) | ✅ Basic auth + ✅ OAuth 2.0 (2026-09-09/10) |
+| Add comment | `POST /rest/api/3/issue/{key}/comment` (ADF body) | mocked (both auth modes) | ✅ Basic auth + ✅ OAuth 2.0 (2026-09-09/10) |
+| Transition | `GET` + `POST /rest/api/3/issue/{key}/transitions` | mocked (both auth modes) | ✅ Basic auth + ✅ OAuth 2.0 (2026-09-09/10) |
+
+The Basic-auth run was repeated twice: once with a classic API token (`HD-2`), and
+once with a **scoped** API token generated for the same service account (`HD-5`) —
+the scoped token initially failed with a misleading permission error when called
+against the site directly, which is what led to routing `basic` mode through the
+`api.atlassian.com/ex/jira/{cloudId}` gateway too (see above); re-verified working
+end to end after that fix.
+
+The OAuth 2.0 run also confirmed the `client_credentials` exchange against
+`auth.atlassian.com` and the `cloudId` resolution via `accessible-resources` — the two
+steps unique to that mode — work against a real service account, not just the mocked
+`test/egress-jira.test.ts` → "service-account OAuth 2.0 auth mode" specs.
 
 ## Data store & refresh
 
