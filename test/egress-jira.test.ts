@@ -25,6 +25,10 @@ const AGENT_UUID = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
 const ASSET_NUM = assetNum(AGENT_UUID);
 const TIER2_IP = "34.202.14.153";
 const JIRA_HOST = "acme.atlassian.net";
+// basic-mode requests never hit JIRA_HOST directly (see JiraClient.resolveCloudId) —
+// they resolve this cloudId via an unauthenticated GET {baseUrl}/_edge/tenant_info,
+// then call api.atlassian.com/ex/jira/{JIRA_CLOUD_ID}/... like oauth mode does.
+const JIRA_CLOUD_ID = "acme-cloud-id";
 const TARGETS = JSON.stringify([
   {
     clientId: 10,
@@ -55,6 +59,12 @@ function installFetch(): void {
     if (req.method === "GET" && /^\/v1\/assets\/agents\//.test(url.pathname)) {
       return new Response("", { status: 404 });
     }
+    // Basic-mode JiraClient resolves its cloudId via this unauthenticated lookup
+    // before every request (see resolveCloudId) — stub it for every test rather
+    // than per-test, since it's not what any test is actually exercising.
+    if (req.method === "GET" && url.host === JIRA_HOST && url.pathname === "/_edge/tenant_info") {
+      return json(200, { cloudId: JIRA_CLOUD_ID });
+    }
     throw new Error(`unmocked fetch: ${req.method} ${req.url}`);
   }) as typeof fetch;
 }
@@ -79,7 +89,7 @@ function captureJiraCreate(key = "SEC-1"): { calls: () => Array<Record<string, u
   const seen: Array<Record<string, unknown>> = [];
   routes.push({
     method: "POST",
-    match: (u) => u.host === JIRA_HOST && u.pathname === "/rest/api/3/issue",
+    match: (u) => u.host === "api.atlassian.com" && u.pathname === `/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue`,
     handler: async (r) => {
       seen.push((await r.json()) as Record<string, unknown>);
       return json(201, { id: "10001", key });
@@ -94,7 +104,7 @@ function captureJiraClose(): { comments: () => string[]; transitioned: () => str
   const transitioned: string[] = [];
   routes.push({
     method: "POST",
-    match: (u) => u.host === JIRA_HOST && /\/rest\/api\/3\/issue\/[^/]+\/comment$/.test(u.pathname),
+    match: (u) => u.host === "api.atlassian.com" && new RegExp(`^/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/[^/]+/comment$`).test(u.pathname),
     handler: (r) => {
       comments.push(new URL(r.url).pathname);
       return json(201, {});
@@ -102,12 +112,12 @@ function captureJiraClose(): { comments: () => string[]; transitioned: () => str
   });
   routes.push({
     method: "GET",
-    match: (u) => u.host === JIRA_HOST && /\/transitions$/.test(u.pathname),
+    match: (u) => u.host === "api.atlassian.com" && new RegExp(`^/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/[^/]+/transitions$`).test(u.pathname),
     handler: () => json(200, { transitions: [{ id: "31", name: "Done" }] }),
   });
   routes.push({
     method: "POST",
-    match: (u) => u.host === JIRA_HOST && /\/transitions$/.test(u.pathname),
+    match: (u) => u.host === "api.atlassian.com" && new RegExp(`^/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue/[^/]+/transitions$`).test(u.pathname),
     handler: (r) => {
       transitioned.push(new URL(r.url).pathname);
       return new Response(null, { status: 204 });
@@ -327,7 +337,7 @@ describe("Jira egress — durable pending_jira drain (flushPendingJira)", () => 
     // Jira create always fails.
     routes.push({
       method: "POST",
-      match: (u) => u.host === JIRA_HOST && u.pathname === "/rest/api/3/issue",
+      match: (u) => u.host === "api.atlassian.com" && u.pathname === `/ex/jira/${JIRA_CLOUD_ID}/rest/api/3/issue`,
       handler: () => json(400, { errorMessages: ["bad"] }),
     });
     // Capture the notifly dead-letter alert (jsons:// -> POST hooks.example.com).

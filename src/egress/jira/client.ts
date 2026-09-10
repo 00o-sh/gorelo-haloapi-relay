@@ -22,17 +22,23 @@ import type { Env } from "../../core/types.js";
  * never a real employee's personal login: a service account has no password, isn't
  * tied to anyone leaving, and doesn't count against the site's user-license seats.
  *
- * - `basic` — email + API token, sent as `Authorization: Basic base64(email:token)`
- *   directly against the site's own `baseUrl`. Simplest to set up; the token is
- *   generated at id.atlassian.com under whichever account (ideally the service
- *   account) is logged in.
+ * - `basic` — email + API token, sent as `Authorization: Basic base64(email:token)`.
+ *   Simplest to set up; the token is generated at id.atlassian.com (or Atlassian
+ *   Administration → Directory → Service accounts → Create credentials → API token)
+ *   under whichever account (ideally the service account) is logged in.
  * - `oauth` — a service account's OAuth 2.0 credential (client id/secret), created
  *   in Atlassian Administration → Directory → Service accounts → Create credentials
  *   → OAuth 2.0. Exchanged via `client_credentials` at `auth.atlassian.com` for a
  *   short-lived bearer token — no redirect/consent step, genuine machine-to-machine
- *   auth. Requests go through `api.atlassian.com/ex/jira/{cloudId}/...` instead of
- *   the site directly, so the client resolves `cloudId` once (cached per instance)
- *   via the token's accessible-resources.
+ *   auth.
+ *
+ * Neither mode calls the site directly — every request goes through
+ * `api.atlassian.com/ex/jira/{cloudId}/...` (see `JiraClient.resolveCloudId`).
+ * This matters for `basic`: Atlassian's newer **scoped** API tokens (its own
+ * token-creation UI now steers you toward picking specific scopes) only work
+ * through this gateway, returning a misleading "no permission" error if called
+ * against the site directly — confirmed live 2026-09-10. A classic (unscoped)
+ * token works through the gateway too, so one code path serves both.
  */
 export type JiraAuth =
   | { mode: "basic"; email: string; apiToken: string }
@@ -43,9 +49,9 @@ export interface JiraTarget {
   /** Gorelo client id this target routes for (the enrollment key). */
   clientId: number;
   /**
-   * Jira Cloud site base URL, e.g. "https://acme.atlassian.net". Always required:
-   * `basic` mode calls it directly; `oauth` mode uses it only to pick the right
-   * `cloudId` out of the service account's accessible resources.
+   * Jira Cloud site base URL, e.g. "https://acme.atlassian.net". Always required —
+   * every request actually goes through `api.atlassian.com/ex/jira/{cloudId}`, never
+   * this URL directly; it's used only to resolve that `cloudId` (see JiraClient).
    */
   baseUrl: string;
   /** Project key new issues are created under, e.g. "SEC". */
@@ -233,12 +239,41 @@ export class JiraClient {
   }
 
   /**
-   * `oauth`-mode requests go through `api.atlassian.com/ex/jira/{cloudId}`, not the
-   * site directly — resolve which accessible resource matches this target's `baseUrl`
-   * (the service account's OAuth credential may have scopes on several sites).
+   * Every request goes through `api.atlassian.com/ex/jira/{cloudId}`, never the site
+   * directly — NOT just for `oauth` mode. Atlassian's newer **scoped** API tokens
+   * (the kind its own token-creation UI now steers you toward — pick specific scopes
+   * like `read:jira-work`/`write:jira-work`) return a misleading "project doesn't
+   * exist or you don't have permission" 400 when called against the site directly;
+   * the identical request succeeds through this gateway with the exact same
+   * credential (confirmed live against a real scoped service-account token, 2026-09-10).
+   * A classic (unscoped) token works through the gateway too, so there is no need to
+   * special-case it — one code path serves both `basic` sub-kinds and `oauth`.
    */
   private async resolveCloudId(): Promise<string> {
     if (this.cloudId) return this.cloudId;
+    if (this.target.auth.mode === "basic") {
+      // No token needed yet to resolve cloudId in basic mode: `_edge/tenant_info` is
+      // an unauthenticated, undocumented-but-widely-relied-upon endpoint that maps a
+      // site hostname to its cloudId (the official `serverInfo` response has no such
+      // field). If Atlassian ever removes it, this throws a JiraError like any other
+      // upstream failure — queued for retry same as everything else in this client.
+      const res = await fetch(`${this.target.baseUrl}/_edge/tenant_info`);
+      const text = await res.text().catch(() => "");
+      if (!res.ok) throw new JiraError("Jira tenant_info lookup failed", res.status, text);
+      let parsed: { cloudId?: string };
+      try {
+        parsed = JSON.parse(text) as { cloudId?: string };
+      } catch {
+        throw new JiraError("Jira tenant_info response was not JSON", res.status, text);
+      }
+      if (!parsed.cloudId) throw new JiraError("Jira tenant_info response carried no cloudId", res.status, text);
+      this.cloudId = parsed.cloudId;
+      return this.cloudId;
+    }
+
+    // oauth mode — resolve via the token's OWN accessible resources (also validates
+    // the service account actually has access to this baseUrl, which tenant_info
+    // above does not check — it just maps any hostname to its id).
     const token = await this.ensureAccessToken();
     const res = await fetch(ACCESSIBLE_RESOURCES_URL, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -275,11 +310,11 @@ export class JiraClient {
   }
 
   private async request(path: string, init?: RequestInit): Promise<Response> {
-    // Sequential, not Promise.all: authHeader() warms the oauth token cache first,
-    // so the resolveCloudId() inside baseUrl() below reuses it instead of racing a
-    // second concurrent token fetch.
+    // Sequential, not Promise.all: in oauth mode, authHeader() warms the token cache
+    // first, so resolveCloudId() below reuses it instead of racing a second
+    // concurrent token fetch.
     const auth = await this.authHeader();
-    const base = this.target.auth.mode === "basic" ? this.target.baseUrl : `https://api.atlassian.com/ex/jira/${await this.resolveCloudId()}`;
+    const base = `https://api.atlassian.com/ex/jira/${await this.resolveCloudId()}`;
     return fetch(`${base}${path}`, {
       ...init,
       headers: {

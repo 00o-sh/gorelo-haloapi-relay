@@ -752,7 +752,7 @@ Directory → Service accounts. Each `JIRA_TARGETS` entry picks **one** of two a
 - **`email` + `apiToken`** (Basic auth, simplest) — a token generated for the service
   account at Atlassian Administration → Directory → Service accounts → the account →
   Create credentials → API token (or at id.atlassian.com while logged in *as* the
-  service account). Calls the site directly.
+  service account).
   ```json
   [{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC",
     "issueType":"Task","email":"svc@acme.com","apiToken":"…","resolvedTransition":"Done"}]
@@ -761,16 +761,23 @@ Directory → Service accounts. Each `JIRA_TARGETS` entry picks **one** of two a
   same service account: Create credentials → OAuth 2.0 → select Jira scopes
   (`read:jira-work` + `write:jira-work` cover create/comment/transition). No
   redirect/consent step — `JiraClient` exchanges these via `client_credentials` at
-  `auth.atlassian.com`, caches the resulting bearer token (and the resolved `cloudId`)
-  per instance, and calls `api.atlassian.com/ex/jira/{cloudId}/...` instead of the site
-  directly.
+  `auth.atlassian.com`, caching the resulting bearer token per instance.
   ```json
   [{"clientId":15567,"baseUrl":"https://acme.atlassian.net","projectKey":"SEC",
     "issueType":"Task","oauthClientId":"…","oauthClientSecret":"…","resolvedTransition":"Done"}]
   ```
 
-`baseUrl` is required either way — in OAuth mode it's only used to pick the right
-`cloudId` out of the service account's accessible sites.
+`baseUrl` is required either way, but **neither mode calls it directly** — every
+request goes through `api.atlassian.com/ex/jira/{cloudId}/...`, with `cloudId`
+resolved once per `JiraClient` instance (`baseUrl` is only used to look it up: via
+the OAuth token's accessible-resources in `oauth` mode, or an unauthenticated
+`{baseUrl}/_edge/tenant_info` lookup in `basic` mode). This matters because
+Atlassian's own token-creation UI increasingly steers you toward **scoped** API
+tokens (pick specific scopes, same page as `oauthClientId`/`oauthClientSecret`
+above) — a scoped token returns a misleading "project doesn't exist or you don't
+have permission" error if called against the site directly, but works fine through
+the gateway. A classic (unscoped) token works through the gateway too, so `basic`
+mode always routes this way regardless of which kind of token you generated.
 
 ### Testing against a free Jira Cloud site (no production Jira needed)
 
@@ -797,6 +804,13 @@ The three Jira REST calls the fan-out makes, and their live-verification status 
 | Create issue | `POST /rest/api/3/issue` (ADF description) | mocked (both auth modes) | ✅ Basic auth + ✅ OAuth 2.0 (2026-09-09/10) |
 | Add comment | `POST /rest/api/3/issue/{key}/comment` (ADF body) | mocked (both auth modes) | ✅ Basic auth + ✅ OAuth 2.0 (2026-09-09/10) |
 | Transition | `GET` + `POST /rest/api/3/issue/{key}/transitions` | mocked (both auth modes) | ✅ Basic auth + ✅ OAuth 2.0 (2026-09-09/10) |
+
+The Basic-auth run was repeated twice: once with a classic API token (`HD-2`), and
+once with a **scoped** API token generated for the same service account (`HD-5`) —
+the scoped token initially failed with a misleading permission error when called
+against the site directly, which is what led to routing `basic` mode through the
+`api.atlassian.com/ex/jira/{cloudId}` gateway too (see above); re-verified working
+end to end after that fix.
 
 The OAuth 2.0 run also confirmed the `client_credentials` exchange against
 `auth.atlassian.com` and the `cloudId` resolution via `accessible-resources` — the two
