@@ -318,7 +318,7 @@ FALLBACK_TAG_ID = "0"        # TODO(staging): "Submitted via API" tag id
 # Fixed Gorelo enums / universal ids — NOT tenant-specific, so these carry over as-is.
 # PublicTicketPriority = [0..4]; TicketSource = [1..6] (6 = API/integration); status 1 = New.
 DEFAULT_STATUS_ID = "1"
-DEFAULT_RESOLVED_STATUS_ID = "3"   # 3 = Solved (built-in status, same id on every tenant)
+DEFAULT_RESOLVED_STATUS_ID = "4"   # 4 = Closed (built-in; the default for non-prod — prod uses 3 Solved)
 DEFAULT_PRIORITY = "2"
 DEFAULT_SOURCE = "6"
 EMERGENCY_PRIORITY = "1"

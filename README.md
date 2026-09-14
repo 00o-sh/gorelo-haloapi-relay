@@ -1082,7 +1082,8 @@ live spec changes.
 - **`DEFAULT_RESOLVED_STATUS_ID`** — the status a Huntress **resolution** moves the
   original ticket to (see "Huntress resolutions" above); set it to your Gorelo
   "Solved"/"Closed" status id (`GET /v1/tickets/statuses` → `3` Solved, `4` Closed —
-  built-in statuses, same ids on every tenant). Production sets `3`. **Leave it unset and
+  built-in statuses, same ids on every tenant). Production uses `3` Solved; the dev and
+  staging configs default to `4` Closed. **Leave it unset and
   every resolution is a silent no-op**: the fallback is `DEFAULT_STATUS_ID` (= `1` New),
   so the PATCH "succeeds", the resolution comment lands, and the ticket never leaves
   New — exactly what happened in production until 2026-09-14.
