@@ -48,7 +48,7 @@ describe("parseJiraTargets", () => {
     const raw = JSON.stringify([
       {
         clientId: 40,
-        baseUrl: "https://yeled.atlassian.net",
+        baseUrl: "https://acme.atlassian.net",
         projectKey: "HD",
         issueType: "[System] Service request",
         requestType: 379, // a number is tolerated only as a string — see below
@@ -57,7 +57,7 @@ describe("parseJiraTargets", () => {
       },
       {
         clientId: 41,
-        baseUrl: "https://yeled.atlassian.net",
+        baseUrl: "https://acme.atlassian.net",
         projectKey: "HD",
         issueType: "[System] Service request",
         requestType: " 379 ",
