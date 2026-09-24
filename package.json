@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@ambersecurityinc/notifly": "0.7.2",
-    "@sentry/cloudflare": "10.74.0"
+    "@sentry/cloudflare": "11.0.0"
   },
   "allowScripts": {
     "esbuild": true,
