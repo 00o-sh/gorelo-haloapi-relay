@@ -133,7 +133,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Cursor from a previous page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -142,7 +141,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Alerts per page, 1-200. Defaults to 50.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -153,7 +151,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "`desc` (default, newest first) or `asc`. Sorted by `CreatedOn`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -163,7 +160,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated status ids: New=1, Ignored=2, Ticketed=3. 0 (Unknown) matches any other status.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -172,7 +168,6 @@
             "name": "TypeIds",
             "in": "query",
             "description": "Comma-separated type ids: Uptime=1, API=2, Script=3, External=4, Slide=5, Huntress=6,\r\nError Event Log=7, Disk Usage=8, Connectivity=9, Process=10, Service=11, Antivirus=12,\r\nRedfish=13, CPU=14, Memory=15, Ping=16, Windows Updates=17, Warranty Expiration=18,\r\nDomain Expiration=19, Contract Expiration=20. 7-17 are device-check alerts, identified by\r\ntheir check type rather than by how the alert was raised. 18-20 carry no device or check;\r\nContract and Domain carry a subject id, Warranty does not. 0 (Unknown) matches an alert this scale cannot\r\nname.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -181,7 +176,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids. An alert type that carries no client id never matches this filter.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -190,7 +184,6 @@
             "name": "DeviceIds",
             "in": "query",
             "description": "Comma-separated device ids (guids).",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -199,7 +192,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "Keeps only alerts raised at or after this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -209,7 +201,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "Keeps only alerts raised strictly before this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -312,7 +303,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -321,7 +311,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -332,7 +321,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated device status ids to include. Deleted and client-inactivated devices are excluded either way.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -341,7 +329,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids to include. Omit for every client.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -350,7 +337,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the device name, display name and description. Up to 200 characters.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -359,7 +345,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only devices updated at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -369,7 +354,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only devices updated strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -379,7 +363,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only devices created at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -389,7 +372,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only devices created strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -492,7 +474,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -501,7 +482,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -512,7 +492,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids to include. Omit for every client.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -521,7 +500,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the asset name, description and serial number. Up to 200 characters.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -530,7 +508,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only assets updated at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -540,7 +517,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only assets updated strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -550,7 +526,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only assets created at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -560,7 +535,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only assets created strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -664,7 +638,6 @@
             "in": "path",
             "description": "Device identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -787,7 +760,6 @@
             "in": "path",
             "description": "Device to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -892,7 +864,6 @@
             "in": "path",
             "description": "Custom asset to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -995,7 +966,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -1004,7 +974,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page, 1-200 (default 50). Out of range is rejected, not clamped.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -1015,7 +984,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids to include. Omit for every client.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -1024,7 +992,6 @@
             "name": "TypeIds",
             "in": "query",
             "description": "Comma-separated check type ids to include: 1 ICMP, 2 HTTP, 3 TCP.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -1033,7 +1000,6 @@
             "name": "TagIds",
             "in": "query",
             "description": "Comma-separated tag ids. A check is included if it carries any one of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -1042,7 +1008,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the check description. Up to 200 characters.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -1260,7 +1225,6 @@
             "in": "path",
             "description": "Uptime check identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1383,7 +1347,6 @@
             "in": "path",
             "description": "Uptime check to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1531,7 +1494,6 @@
             "in": "path",
             "description": "Uptime check to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1781,7 +1743,6 @@
             "in": "path",
             "description": "Invoice identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2111,7 +2072,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page. Only valid against the same filters that produced it.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2120,7 +2080,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -2131,7 +2090,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids; keeps only time entries billed to any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2140,7 +2098,6 @@
             "name": "LocationIds",
             "in": "query",
             "description": "Comma-separated client location ids; keeps only time entries whose ticket sits at any of them. Entries logged against a task have no location and are excluded.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2149,7 +2106,6 @@
             "name": "TicketIds",
             "in": "query",
             "description": "Comma-separated ticket ids; keeps only time entries logged against any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2158,7 +2114,6 @@
             "name": "TaskIds",
             "in": "query",
             "description": "Comma-separated task ids; keeps only time entries logged against any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2167,7 +2122,6 @@
             "name": "UserIds",
             "in": "query",
             "description": "Comma-separated user ids; keeps only time entries belonging to any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2176,7 +2130,6 @@
             "name": "InvoiceIds",
             "in": "query",
             "description": "Comma-separated invoice ids; keeps only time entries billed on any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2185,7 +2138,6 @@
             "name": "StartedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only time entries whose work started at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -2195,7 +2147,6 @@
             "name": "StartedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only time entries whose work started strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -2205,7 +2156,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only time entries created at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -2215,7 +2165,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only time entries created strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -2225,7 +2174,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only time entries updated at or after it. An entry that has never been changed is excluded.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -2235,7 +2183,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only time entries updated strictly before it. An entry that has never been changed is excluded.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -2497,7 +2444,6 @@
             "in": "path",
             "description": "Time entry to read.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -2601,7 +2547,6 @@
             "in": "path",
             "description": "Time entry to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -2770,7 +2715,6 @@
             "in": "path",
             "description": "Time entry to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -2894,7 +2838,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page. Only valid against the same filters that produced it.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -2903,7 +2846,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1-200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -2914,7 +2856,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids; keeps only contracts billed to any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3018,7 +2959,6 @@
             "in": "path",
             "description": "Identifier of the contract.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -3121,7 +3061,6 @@
             "in": "path",
             "description": "Identifier of the contract.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -3245,7 +3184,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page. Only valid against the same filters and sort that produced it.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3254,7 +3192,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. 1-200 (default 50); out of range is a 400, never clamped.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -3265,7 +3202,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids; keeps only invoices billed to any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3274,7 +3210,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated status ids (1 Draft, 3 Paid, 4 Void, 5 Approved).",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3283,7 +3218,6 @@
             "name": "ContractIds",
             "in": "query",
             "description": "Comma-separated contract ids; keeps only invoices raised from any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3292,7 +3226,6 @@
             "name": "Number",
             "in": "query",
             "description": "Exact match on the invoice's bare sequential number (the wire's `Number`, not `DisplayNumber`). A value that does not parse as a whole number is a 400.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3301,7 +3234,6 @@
             "name": "InvoiceDateSince",
             "in": "query",
             "description": "Keeps only invoices dated at or after this date.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3311,7 +3243,6 @@
             "name": "InvoiceDateBefore",
             "in": "query",
             "description": "Keeps only invoices dated strictly before this date.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3321,7 +3252,6 @@
             "name": "DueDateSince",
             "in": "query",
             "description": "Keeps only invoices due at or after this date.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3331,7 +3261,6 @@
             "name": "DueDateBefore",
             "in": "query",
             "description": "Keeps only invoices due strictly before this date.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3341,7 +3270,6 @@
             "name": "IsEmailSent",
             "in": "query",
             "description": "Keeps only invoices that have (true) or have not (false) been emailed to the client.",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -3350,7 +3278,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "Keeps only invoices created at or after this instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3360,7 +3287,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "Keeps only invoices created at or before this instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3370,7 +3296,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "Keeps only invoices last updated at or after this instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3380,7 +3305,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "Keeps only invoices last updated at or before this instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -3390,7 +3314,6 @@
             "name": "Query",
             "in": "query",
             "description": "Free-text search against the invoice number, reference and name.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3399,7 +3322,6 @@
             "name": "SortBy",
             "in": "query",
             "description": "Sort field: createdOn (default), updatedOn, date, dueDate or totalAmount.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "createdOn"
@@ -3409,7 +3331,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "Sort direction: asc or desc (default).",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -3669,7 +3590,6 @@
             "in": "path",
             "description": "Invoice identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -3772,7 +3692,6 @@
             "in": "path",
             "description": "Invoice identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -3968,7 +3887,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page. Only valid against the same filters that produced it.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3977,7 +3895,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Rejected with a 400 outside 1-200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -3988,7 +3905,6 @@
             "name": "TypeIds",
             "in": "query",
             "description": "Comma-separated item type ids (1 Product, 2 Bundle).",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -3997,7 +3913,6 @@
             "name": "CategoryIds",
             "in": "query",
             "description": "Comma-separated category ids.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4006,7 +3921,6 @@
             "name": "SubcategoryIds",
             "in": "query",
             "description": "Comma-separated subcategory ids.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4015,7 +3929,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4024,7 +3937,6 @@
             "name": "Skus",
             "in": "query",
             "description": "Comma-separated SKUs, matched exactly.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4033,7 +3945,6 @@
             "name": "Vendors",
             "in": "query",
             "description": "Comma-separated vendor names, matched exactly.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4042,7 +3953,6 @@
             "name": "PartNumbers",
             "in": "query",
             "description": "Comma-separated manufacturer part numbers, matched exactly.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4051,7 +3961,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated status ids (1 Active, 2 Archived).",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4060,7 +3969,6 @@
             "name": "Query",
             "in": "query",
             "description": "Free-text keyword matched against Name and Description. Max 200 characters.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4069,7 +3977,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "Only items created on or after this UTC instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4079,7 +3986,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "Only items created on or before this UTC instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4089,7 +3995,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "Only items last changed on or after this UTC instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4099,7 +4004,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "Only items last changed on or before this UTC instant.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4319,7 +4223,6 @@
             "in": "path",
             "description": "Identifier of the item.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4422,7 +4325,6 @@
             "in": "path",
             "description": "Item to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4570,7 +4472,6 @@
             "in": "path",
             "description": "Item to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -4693,7 +4594,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4702,7 +4602,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -4713,7 +4612,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated client status ids to include; when omitted, inactive (2) clients are excluded, and when supplied only the listed statuses are returned.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4722,7 +4620,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the client name, alternate name, billing name and web domains. Up to 200 characters.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -4731,7 +4628,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only clients updated at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4741,7 +4637,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only clients updated strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4751,7 +4646,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only clients created at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4761,7 +4655,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only clients created strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -4979,7 +4872,6 @@
             "in": "path",
             "description": "Client to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5126,7 +5018,6 @@
             "in": "path",
             "description": "Client identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5249,7 +5140,6 @@
             "in": "path",
             "description": "Client to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5373,7 +5263,6 @@
             "in": "path",
             "description": "Client identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5498,7 +5387,6 @@
             "in": "path",
             "description": "Contact to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5620,7 +5508,6 @@
             "in": "path",
             "description": "Contact identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5742,7 +5629,6 @@
             "in": "path",
             "description": "Contact to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5890,7 +5776,6 @@
             "name": "ClientId",
             "in": "query",
             "description": "Deprecated single-client filter, superseded by clientIds. Still accepted;\r\nignored when clientIds is supplied.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int64"
@@ -5900,7 +5785,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5909,7 +5793,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -5920,7 +5803,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids to include. Omit for every client.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5929,7 +5811,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated contact status ids to include.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5938,7 +5819,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the contact email addresses, first name and last name. Up to 200 characters.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -5947,7 +5827,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only contacts updated at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -5957,7 +5836,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only contacts updated strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -5967,7 +5845,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only contacts created at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -5977,7 +5854,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only contacts created strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -6195,7 +6071,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6204,7 +6079,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page, 1-200 (default 50). Out of range is rejected, not clamped.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -6215,7 +6089,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "Sort direction by last update: `asc` or `desc` (default).",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -6225,7 +6098,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated form status ids: Active=1, Archived=2. Defaults to Active.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6234,7 +6106,6 @@
             "name": "GroupIds",
             "in": "query",
             "description": "Comma-separated technician group ids; matches forms assigned to any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6243,7 +6114,6 @@
             "name": "TagIds",
             "in": "query",
             "description": "Comma-separated ticket tag ids; matches forms that apply any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6252,7 +6122,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids; matches forms restricted to any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6261,7 +6130,6 @@
             "name": "AllowInPortal",
             "in": "query",
             "description": "Keeps only forms offered (`true`) or not offered (`false`) in the client portal.",
-            "style": "form",
             "schema": {
               "type": "boolean"
             }
@@ -6270,7 +6138,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the form title, case-insensitively.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6374,7 +6241,6 @@
             "in": "path",
             "description": "Form whose responses to list.",
             "required": true,
-            "style": "simple",
             "schema": {
               "pattern": "^[A-Za-z0-9_-]{1,50}$",
               "type": "string"
@@ -6384,7 +6250,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6393,7 +6258,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page, 1-200 (default 50). Out of range is rejected, not clamped.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -6519,7 +6383,6 @@
             "in": "path",
             "description": "Form the link is for.",
             "required": true,
-            "style": "simple",
             "schema": {
               "pattern": "^[A-Za-z0-9_-]{1,50}$",
               "type": "string"
@@ -6667,7 +6530,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -6676,7 +6538,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -7082,7 +6943,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7091,7 +6951,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page, 1-200 (default 50). Out of range is rejected, not clamped.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -7102,7 +6961,6 @@
             "name": "SortBy",
             "in": "query",
             "description": "Sort field: `updatedOn` (default) or `createdOn`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "updatedOn"
@@ -7112,7 +6970,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "Sort direction: `asc` or `desc` (default).",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -7122,7 +6979,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated project status ids: NotStarted=1, InProgress=2, OnHold=3, Completed=4, Closed=5.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7131,7 +6987,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7140,7 +6995,6 @@
             "name": "TypeIds",
             "in": "query",
             "description": "Comma-separated project type ids (Guids).",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7149,7 +7003,6 @@
             "name": "LeadAssigneeIds",
             "in": "query",
             "description": "Comma-separated lead assignee (technician) ids.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7158,7 +7011,6 @@
             "name": "TagIds",
             "in": "query",
             "description": "Comma-separated tag ids (Guids).",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7167,7 +7019,6 @@
             "name": "GroupIds",
             "in": "query",
             "description": "Comma-separated technician group ids.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7176,7 +7027,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the project title, number and display number.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -7185,7 +7035,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "Keeps only projects updated at or after this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -7195,7 +7044,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "Keeps only projects updated strictly before this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -7205,7 +7053,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "Keeps only projects created at or after this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -7215,7 +7062,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "Keeps only projects created strictly before this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -7225,7 +7071,6 @@
             "name": "TargetDateAfter",
             "in": "query",
             "description": "Keeps only projects with a target date at or after this instant (UTC). A project with no target date matches neither bound.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -7235,7 +7080,6 @@
             "name": "TargetDateBefore",
             "in": "query",
             "description": "Keeps only projects with a target date strictly before this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -7340,7 +7184,6 @@
             "in": "path",
             "description": "Project identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7463,7 +7306,6 @@
             "in": "path",
             "description": "Project to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7611,7 +7453,6 @@
             "in": "path",
             "description": "Project to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -7880,7 +7721,6 @@
             "in": "path",
             "description": "Project identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8003,7 +7843,6 @@
             "in": "path",
             "description": "Project to add the section to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8153,7 +7992,6 @@
             "in": "path",
             "description": "Project the section belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8164,7 +8002,6 @@
             "in": "path",
             "description": "Section to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8312,7 +8149,6 @@
             "in": "path",
             "description": "Project the section belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8323,7 +8159,6 @@
             "in": "path",
             "description": "Section to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8448,7 +8283,6 @@
             "in": "path",
             "description": "Project whose tasks to list.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8458,7 +8292,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -8467,7 +8300,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page, 1-200 (default 50). Out of range is rejected, not clamped.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -8478,7 +8310,6 @@
             "name": "SortBy",
             "in": "query",
             "description": "Sort field: `boardOrder` (default), `createdOn` or `updatedOn`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "boardOrder"
@@ -8488,7 +8319,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "Sort direction: `asc` (default) or `desc`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "asc"
@@ -8498,7 +8328,6 @@
             "name": "SectionIds",
             "in": "query",
             "description": "Comma-separated section ids (Guids).",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -8507,7 +8336,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated status ids: NotStarted=1, WorkingOnIt=2, OnHold=3, Done=4.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -8516,7 +8344,6 @@
             "name": "AssigneeIds",
             "in": "query",
             "description": "Comma-separated technician ids; matches a task's lead or assisting assignees.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -8525,7 +8352,6 @@
             "name": "LeadAssigneeIds",
             "in": "query",
             "description": "Comma-separated technician ids; matches a task's lead assignee only.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -8534,7 +8360,6 @@
             "name": "IncompleteOnly",
             "in": "query",
             "description": "When true, drops tasks in the Done status.",
-            "style": "form",
             "schema": {
               "type": "boolean",
               "default": false
@@ -8544,7 +8369,6 @@
             "name": "DueAfter",
             "in": "query",
             "description": "Keeps only tasks due at or after this instant (UTC). A task with no due date matches neither bound.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -8554,7 +8378,6 @@
             "name": "DueBefore",
             "in": "query",
             "description": "Keeps only tasks due strictly before this instant (UTC).",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -8677,7 +8500,6 @@
             "in": "path",
             "description": "Project to create the task in.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8827,7 +8649,6 @@
             "in": "path",
             "description": "Project to comment on.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8975,7 +8796,6 @@
             "in": "path",
             "description": "Project whose comments to return.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8985,7 +8805,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Cursor from a previous page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -8994,7 +8813,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Comments per page, 1-200. Defaults to 50.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -9005,7 +8823,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "`desc` (default, newest first) or `asc`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -9129,7 +8946,6 @@
             "in": "path",
             "description": "Project the comment belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9140,7 +8956,6 @@
             "in": "path",
             "description": "Comment to return.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9263,7 +9078,6 @@
             "in": "path",
             "description": "Project the comment belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9274,7 +9088,6 @@
             "in": "path",
             "description": "Comment to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9419,7 +9232,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9430,7 +9242,6 @@
             "in": "path",
             "description": "Task to return.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9553,7 +9364,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9564,7 +9374,6 @@
             "in": "path",
             "description": "Task to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9712,7 +9521,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9723,7 +9531,6 @@
             "in": "path",
             "description": "Task to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9848,7 +9655,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -9859,7 +9665,6 @@
             "in": "path",
             "description": "Task to comment on.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10007,7 +9812,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10018,7 +9822,6 @@
             "in": "path",
             "description": "Task whose comments to return.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10028,7 +9831,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Cursor from a previous page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -10037,7 +9839,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Comments per page, 1-200. Defaults to 50.",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -10048,7 +9849,6 @@
             "name": "SortBy",
             "in": "query",
             "description": "Sort field: `createdOn`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "createdOn"
@@ -10058,7 +9858,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "`desc` (default, newest first) or `asc`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -10068,7 +9867,6 @@
             "name": "ConversationType",
             "in": "query",
             "description": "Kinds to include: `1` Public, `2` Private, `3` Side Conversation, `4` Approval. Comma-separated on its own; a single value when paired with conversationId.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -10077,7 +9875,6 @@
             "name": "ConversationId",
             "in": "query",
             "description": "Identifier of the single conversation to read, from the conversations endpoint. Requires a single conversationType.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -10201,7 +9998,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10212,7 +10008,6 @@
             "in": "path",
             "description": "Task to start the conversation on.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10362,7 +10157,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10373,7 +10167,6 @@
             "in": "path",
             "description": "Task the approval is for.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10523,7 +10316,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10534,7 +10326,6 @@
             "in": "path",
             "description": "Task the comment belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10545,7 +10336,6 @@
             "in": "path",
             "description": "Comment to return.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10668,7 +10458,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10679,7 +10468,6 @@
             "in": "path",
             "description": "Task the comment belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10690,7 +10478,6 @@
             "in": "path",
             "description": "Comment to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10835,7 +10622,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10846,7 +10632,6 @@
             "in": "path",
             "description": "Task whose conversations to return.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10971,7 +10756,6 @@
             "in": "path",
             "description": "Project the task belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10982,7 +10766,6 @@
             "in": "path",
             "description": "Task the approval is on.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -10993,7 +10776,6 @@
             "in": "path",
             "description": "Approval identifier, from the conversations endpoint.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11230,7 +11012,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11239,7 +11020,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -11250,7 +11030,6 @@
             "name": "SortBy",
             "in": "query",
             "description": "Sort field: `updatedOn` (default) or `createdOn`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "updatedOn"
@@ -11260,7 +11039,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "Sort direction: `asc` or `desc` (default).",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "desc"
@@ -11270,7 +11048,6 @@
             "name": "StatusIds",
             "in": "query",
             "description": "Comma-separated status ids to include. Omit for every status.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11279,7 +11056,6 @@
             "name": "ClientIds",
             "in": "query",
             "description": "Comma-separated client ids to include. Omit for every client.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11288,7 +11064,6 @@
             "name": "PriorityIds",
             "in": "query",
             "description": "Comma-separated priority ids on the public scale — None=0, Urgent=1, High=2, Normal=3, Low=4.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11297,7 +11072,6 @@
             "name": "TypeIds",
             "in": "query",
             "description": "Comma-separated ticket type ids to include.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11306,7 +11080,6 @@
             "name": "LeadAssigneeIds",
             "in": "query",
             "description": "Comma-separated lead assignee ids to include.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11315,7 +11088,6 @@
             "name": "ContactIds",
             "in": "query",
             "description": "Comma-separated contact ids to include.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11324,7 +11096,6 @@
             "name": "TagIds",
             "in": "query",
             "description": "Comma-separated tag ids; a ticket matches if it carries any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11333,7 +11104,6 @@
             "name": "GroupIds",
             "in": "query",
             "description": "Comma-separated group ids; a ticket matches if it is subscribed to any of them.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11342,7 +11112,6 @@
             "name": "Query",
             "in": "query",
             "description": "Keyword matched against the ticket title, number and display number. Up to 200 characters.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -11351,7 +11120,6 @@
             "name": "UpdatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only tickets updated at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -11361,7 +11129,6 @@
             "name": "UpdatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only tickets updated strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -11371,7 +11138,6 @@
             "name": "CreatedSince",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only tickets created at or after it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -11381,7 +11147,6 @@
             "name": "CreatedBefore",
             "in": "query",
             "description": "ISO-8601 timestamp; keeps only tickets created strictly before it.",
-            "style": "form",
             "schema": {
               "type": "string",
               "format": "date-time"
@@ -11486,7 +11251,6 @@
             "in": "path",
             "description": "Ticket to update.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11634,7 +11398,6 @@
             "in": "path",
             "description": "Ticket to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11757,7 +11520,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11882,7 +11644,6 @@
             "in": "path",
             "description": "Ticket the comment belongs to.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11893,7 +11654,6 @@
             "in": "path",
             "description": "Comment to delete.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12015,7 +11775,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12026,7 +11785,6 @@
             "in": "path",
             "description": "Comment identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12363,7 +12121,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12490,7 +12247,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12500,7 +12256,6 @@
             "name": "ConversationType",
             "in": "query",
             "description": "Kinds to include: `1` Public, `2` Private, `3` Side Conversation, `4` Approval. Comma-separated on its own; a single value when paired with conversationId.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -12509,7 +12264,6 @@
             "name": "ConversationId",
             "in": "query",
             "description": "Identifier of the single conversation to read, from the conversations endpoint. Requires a single conversationType.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -12518,7 +12272,6 @@
             "name": "Cursor",
             "in": "query",
             "description": "Opaque pagination cursor from a previous page; omit for the first page.",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -12527,7 +12280,6 @@
             "name": "PageSize",
             "in": "query",
             "description": "Number of items per page. Clamped to 1–200 (default 50).",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -12538,7 +12290,6 @@
             "name": "SortBy",
             "in": "query",
             "description": "Sort field: `createdOn`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "createdOn"
@@ -12548,7 +12299,6 @@
             "name": "SortOrder",
             "in": "query",
             "description": "Sort direction: `asc` (default) or `desc`.",
-            "style": "form",
             "schema": {
               "type": "string",
               "default": "asc"
@@ -12652,7 +12402,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12756,7 +12505,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12767,7 +12515,6 @@
             "in": "path",
             "description": "Approval identifier, from the conversations endpoint.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -12891,7 +12638,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -13040,7 +12786,6 @@
             "in": "path",
             "description": "Ticket identifier.",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
