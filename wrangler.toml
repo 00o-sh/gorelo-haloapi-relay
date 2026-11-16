@@ -116,6 +116,8 @@ CATCHALL_CLIENT_ID = "15567"
 HDB_TAG_ID = "31974"
 # 32870 "Submitted via Huntress" — Huntress tickets.
 HUNTRESS_TAG_ID = "32870"
+# 34732 "Submitted via Nerdio" — Nerdio Manager for MSP tickets.
+NERDIO_TAG_ID = "34732"
 # 32885 "Submitted via API" — catch-all applied when a ticket's product has no tag of its
 # own (a service onboarded before its dedicated tag is wired up, or a request that matched
 # no product). Ensures nothing is left untagged if we forget to add a per-service tag.
@@ -324,6 +326,7 @@ DEFAULT_TYPE_ID = "0"        # TODO(staging): ticket type id ("Incident" in prod
 CATCHALL_CLIENT_ID = "0"     # TODO(staging): fallback client id
 HDB_TAG_ID = "0"             # TODO(staging): "Submitted VIA HDB" tag id
 HUNTRESS_TAG_ID = "0"        # TODO(staging): "Submitted via Huntress" tag id
+NERDIO_TAG_ID = "0"          # TODO(staging): "Submitted via Nerdio" tag id
 FALLBACK_TAG_ID = "0"        # TODO(staging): "Submitted via API" tag id
 
 # Fixed Gorelo enums / universal ids — NOT tenant-specific, so these carry over as-is.
