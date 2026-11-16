@@ -951,10 +951,16 @@ curl -X POST https://<your-worker-host>/admin/debug-error -H "X-Admin-Key: <ADMI
   never widens; Huntress requires `Huntress Halo Integration`). `matchProduct()`
   returns which enabled product a request came from (the hook per-product handling
   branches on); `ipAllowed()` is a thin wrapper over it.
-  - `ENABLE_TIER2` / `ENABLE_HUNTRESS` (`"true"`/`"false"`): an **unset** flag falls
-    back to the product's built-in default — **tier2 on, huntress off** — so a
+  - `ENABLE_TIER2` / `ENABLE_HUNTRESS` / `ENABLE_NERDIO` (`"true"`/`"false"`): an **unset** flag falls
+    back to the product's built-in default — **tier2 on, huntress and nerdio off** — so a
     missing var can't silently flip behavior. If **every** product is disabled the
     allowlist fails closed (rejects all).
+  - **Nerdio Manager for MSP** has no vendor-wide IPs: NMM runs in your own Azure
+    subscription, so set `NERDIO_IPS` (comma/space-separated IPs and/or CIDRs) to the
+    NMM App Service's outbound addresses (`az webapp show -g <rg> -n <app> --query
+    possibleOutboundIpAddresses -o tsv`). Empty fails closed. NMM sends no `User-Agent`,
+    so it is IP-only; its credentials are `HALO_CLIENT_ID_NERDIO`/`HALO_CLIENT_SECRET_NERDIO`
+    (`./scripts/halo-cred.sh nerdio`).
   - The whole allowlist is disabled **only** by an explicit, normalized
     `ENFORCE_IP_ALLOWLIST` of `false`, `0`, or empty; an unset var, `true`, or any
     other value enforces. An absent `CF-Connecting-IP` header also fails closed.
