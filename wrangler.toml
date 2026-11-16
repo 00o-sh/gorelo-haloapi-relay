@@ -65,6 +65,10 @@ ENABLE_NERDIO = "false"
 # Nerdio Manager for MSP source IPs (comma/space separated): the NMM App Service's
 # outbound addresses in YOUR Azure subscription (see src/ingress/products.ts "nerdio").
 NERDIO_IPS = ""
+ENABLE_CIPP = "false"
+# CIPP source IPs (comma/space separated): your CIPP instance\'s Function App outbound
+# addresses (see src/ingress/products.ts "cipp").
+CIPP_IPS = ""
 
 # --- Gorelo IDs: fill these from scripts/gorelo-ids.sh (values below are from the live Salient tenant) ---
 # groupId / typeId / priorityId / sourceId are NON-NULLABLE on CreatePublicTicketCommand
@@ -118,6 +122,8 @@ HDB_TAG_ID = "31974"
 HUNTRESS_TAG_ID = "32870"
 # 34732 "Submitted via Nerdio" — Nerdio Manager for MSP tickets.
 NERDIO_TAG_ID = "34732"
+# 38344 "Submitted via CIPP" — CIPP HaloPSA-extension tickets.
+CIPP_TAG_ID = "38344"
 # 32885 "Submitted via API" — catch-all applied when a ticket's product has no tag of its
 # own (a service onboarded before its dedicated tag is wired up, or a request that matched
 # no product). Ensures nothing is left untagged if we forget to add a per-service tag.
@@ -317,6 +323,10 @@ ENABLE_NERDIO = "false"
 # Nerdio Manager for MSP source IPs (comma/space separated): the NMM App Service's
 # outbound addresses in YOUR Azure subscription (see src/ingress/products.ts "nerdio").
 NERDIO_IPS = ""
+ENABLE_CIPP = "false"
+# CIPP source IPs (comma/space separated): your CIPP instance\'s Function App outbound
+# addresses (see src/ingress/products.ts "cipp").
+CIPP_IPS = ""
 
 # OFF for staging. Staging tenants are usually seeded from production, so a real client's
 # JIRA_TARGETS entry would mirror test tickets into their live Jira. Enable deliberately
@@ -332,6 +342,7 @@ CATCHALL_CLIENT_ID = "0"     # TODO(staging): fallback client id
 HDB_TAG_ID = "0"             # TODO(staging): "Submitted VIA HDB" tag id
 HUNTRESS_TAG_ID = "0"        # TODO(staging): "Submitted via Huntress" tag id
 NERDIO_TAG_ID = "0"          # TODO(staging): "Submitted via Nerdio" tag id
+CIPP_TAG_ID = "0"            # TODO(staging): "Submitted via CIPP" tag id
 FALLBACK_TAG_ID = "0"        # TODO(staging): "Submitted via API" tag id
 
 # Fixed Gorelo enums / universal ids — NOT tenant-specific, so these carry over as-is.
