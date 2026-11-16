@@ -480,6 +480,34 @@ async function handleTicketTypes(env: Env): Promise<Response> {
 }
 
 /**
+ * Raise a ticket to VIP_PRIORITY when its matched contact carries one of the
+ * VIP_CONTACT_TAG_IDS (a Gorelo contact tag). Only raises: an already-higher priority
+ * (lower non-zero id, e.g. an emergency's Urgent) is kept. Off -- and no Gorelo call --
+ * unless VIP_CONTACT_TAG_IDS is set and a contact matched. Best-effort: a failed lookup
+ * leaves the priority as built.
+ */
+async function applyVipPriority(env: Env, cmd: CreatePublicTicketCommand): Promise<void> {
+  const vipTags = new Set(
+    String(env.VIP_CONTACT_TAG_IDS ?? "")
+      .split(/[\s,]+/)
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0),
+  );
+  if (!vipTags.size || cmd.contactId == null) return;
+  const vipPriority = num(env.VIP_PRIORITY) ?? 2;
+  if (cmd.priorityId > 0 && cmd.priorityId <= vipPriority) return; // already at least as high
+  try {
+    const tags = await new GoreloClient(env).getContactTagIds(cmd.contactId);
+    if (tags.some((t) => vipTags.has(t))) {
+      cmd.priorityId = vipPriority as PublicTicketPriority;
+      breadcrumb(`HALO VIP contact=${cmd.contactId} -> priority ${vipPriority}`);
+    }
+  } catch (err) {
+    breadcrumb(`HALO VIP lookup failed contact=${cmd.contactId}: ${describeError(err)}`);
+  }
+}
+
+/**
  * GET /api/Agent -- the Gorelo account's active technicians (GET /v1/organization/users)
  * as Halo agents, so a vendor's assignee picker is populated. Ids are Gorelo user ids.
  * The relay does not assign tickets from it; an empty list is served if Gorelo fails.
@@ -1076,6 +1104,7 @@ async function handleCreateTicket(
   const t = firstTicket(parseJson(body));
   const routing = await resolveRouting(env, t, product);
   const cmd = buildTicketCommand(env, t, routing, product, await resolveTypeId(env, t));
+  await applyVipPriority(env, cmd);
   const haloId = assetNum(crypto.randomUUID()) || Date.now() % 1_000_000_000_000;
 
   // Huntress resolution: Huntress signals "resolved" by EDITING the original ticket

@@ -57,6 +57,10 @@ export interface Env {
   // onboarded before its dedicated tag is wired up) — "Submitted via API".
   FALLBACK_TAG_ID?: string;
   EMERGENCY_PRIORITY?: string; // priority id for a press flagged "This is an emergency"
+  // Gorelo contact tag ids (comma/space separated) that mark a VIP. A ticket whose
+  // matched contact carries one is raised to VIP_PRIORITY. Empty/unset = off (no lookup).
+  VIP_CONTACT_TAG_IDS?: string;
+  VIP_PRIORITY?: string; // Gorelo PriorityId for VIP tickets (default 2, High)
   // "true" asks Gorelo to send its "ticket created" email — but ONLY when the Worker
   // resolved a real client contact (contactId), so the mail never fires on the
   // catch-all/no-contact fallback. Any other value (or unset) suppresses it.

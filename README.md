@@ -476,6 +476,12 @@ nothing is left untagged. These are tags, not the ticket type (`DEFAULT_TYPE_ID`
 `src/products.ts` and its `*_TAG_ID` var in `wrangler.toml`. `scripts/gorelo-ids.sh` lists the
 account's ticket tag ids (`GET /v1/tickets/tags`).
 
+**VIP contacts.** Set `VIP_CONTACT_TAG_IDS` to one or more Gorelo *contact* tag ids
+(`scripts/gorelo-ids.sh` lists them, from `GET /v1/contacts/tags`) and a ticket whose
+matched contact carries one of those tags is raised to `VIP_PRIORITY` (default `2`, High).
+It only ever raises a priority, never lowers it, so an emergency press stays Urgent. Empty
+(the default) turns it off, and no contact lookup is made.
+
 **Attachments (screenshots / diagnostic data):** the binaries are **not** sent to us.
 HDB hosts the full report and the remote session on its own portal and only sends
 hyperlinks, which we surface in the ticket. Gorelo's public API has no attachment

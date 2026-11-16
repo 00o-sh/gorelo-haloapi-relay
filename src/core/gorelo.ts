@@ -444,6 +444,16 @@ export class GoreloClient {
   }
 
   /**
+   * GET /v1/contacts/{contactId} -- the contact's tag ids (ContactResponse.TagIds).
+   * Throws GoreloError on non-2xx.
+   */
+  async getContactTagIds(contactId: number): Promise<number[]> {
+    const raw = await this.getJsonWithRetry<unknown>(`/v1/contacts/${encodeURIComponent(String(contactId))}`, 2);
+    const c = (unwrap(raw).data ?? {}) as { tagIds?: unknown };
+    return asArray<unknown>(c.tagIds).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  }
+
+  /**
    * GET /v1/organization/users -- the account's active technicians (StatusIds=2),
    * one page of up to 200. Used to answer a Halo client's agent list.
    */

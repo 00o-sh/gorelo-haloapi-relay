@@ -1941,3 +1941,68 @@ describe("Nerdio Manager for MSP (replayed live payloads, 2026-11-16)", () => {
     });
   });
 });
+
+describe("VIP contacts (VIP_CONTACT_TAG_IDS)", () => {
+  async function createFor(tagIds: number[] | null): Promise<{ posted: Record<string, unknown> | undefined; lookups: number }> {
+    let lookups = 0;
+    if (tagIds) {
+      routes.push({
+        method: "GET",
+        match: (u) => u.pathname === "/v1/contacts/55",
+        handler: () => {
+          lookups++;
+          return json(200, envelope(pascal({ id: 55, firstName: "Jane", tagIds })));
+        },
+      });
+    }
+    const cap = captureGoreloCreate();
+    const created = await req("/tickets", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ summary: "help", details_html: reportHtml({ email: "user@corp.com" }) }]),
+    });
+    const haloId = ((await created.json()) as { id: number }).id;
+    await req("/actions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
+      body: JSON.stringify([{ note_html: `<p>You have a new ticket number ${haloId} from your Helpdesk</p>` }]),
+    });
+    return { posted: cap.posted(), lookups };
+  }
+
+  async function withVip(tags: string, fn: () => Promise<void>): Promise<void> {
+    const e = env as { VIP_CONTACT_TAG_IDS?: string; VIP_PRIORITY?: string };
+    const prev = { ...e };
+    e.VIP_CONTACT_TAG_IDS = tags;
+    e.VIP_PRIORITY = "1";
+    try {
+      await fn();
+    } finally {
+      e.VIP_CONTACT_TAG_IDS = prev.VIP_CONTACT_TAG_IDS;
+      e.VIP_PRIORITY = prev.VIP_PRIORITY;
+    }
+  }
+
+  it("raises a ticket from a contact with a VIP tag to VIP_PRIORITY", async () => {
+    await withVip("900, 901", async () => {
+      const { posted, lookups } = await createFor([5, 901]);
+      expect(lookups).toBe(1);
+      expect(posted).toMatchObject({ contactId: 55, priorityId: 1 });
+    });
+  });
+
+  it("leaves a non-VIP contact at the default priority", async () => {
+    await withVip("900", async () => {
+      const { posted } = await createFor([5]);
+      expect(posted).toMatchObject({ contactId: 55, priorityId: 2 });
+    });
+  });
+
+  it("is off when VIP_CONTACT_TAG_IDS is empty: no contact lookup at all", async () => {
+    await withVip("", async () => {
+      const { posted, lookups } = await createFor([900]);
+      expect(lookups).toBe(0);
+      expect(posted).toMatchObject({ priorityId: 2 });
+    });
+  });
+});
