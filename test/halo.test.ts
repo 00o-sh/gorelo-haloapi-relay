@@ -34,6 +34,12 @@ function installFetch(): void {
     if (req.method === "GET" && /^\/v1\/assets\/agents\//.test(url.pathname)) {
       return new Response("", { status: 404 });
     }
+    // Same for the live ticket-type list: /api/TicketType and a non-default
+    // tickettype_id on create both tolerate it failing and fall back to
+    // DEFAULT_TYPE_ID. Tests that care about the list mock it explicitly.
+    if (req.method === "GET" && url.pathname === "/v1/tickets/types") {
+      return new Response("", { status: 404 });
+    }
     throw new Error(`unmocked fetch: ${req.method} ${req.url}`);
   }) as typeof fetch;
 }
