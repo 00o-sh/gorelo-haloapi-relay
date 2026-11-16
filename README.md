@@ -76,7 +76,7 @@ each other** — both import core/, and they meet only through `core/events.ts` 
 | `src/egress/jira/` | the Jira fan-out — a `TicketEventSubscriber` + dependency-free Jira Cloud client + `pending_jira` drain |
 | `docs/halo-swagger.v2.json` | the real HaloPSA OpenAPI spec — reference for shaping mock responses |
 | `migrations/0001_init.sql` / `0002_jira_fanout.sql` | D1 schema (also self-created at runtime) |
-| `scripts/gorelo-ids.sh` | dump groups/types/statuses/clients to fill the vars |
+| `scripts/gorelo-ids.sh` | dump ticket types/statuses/priorities/sources and clients to fill the vars |
 | `scripts/halo-cred.sh` / `.ps1` | generate a per-product Halo OAuth pair, push the secret, print the creds |
 | `scripts/check-import-boundaries.mjs` | the ingress↔egress boundary check (CI + `npm run lint:boundaries`) |
 | `test/` | vitest specs (`@cloudflare/vitest-plugin`) |
