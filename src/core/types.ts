@@ -177,6 +177,9 @@ export interface PostAlertRequest {
   resource: string; // host/service the alert is raised for (e.g. "SPH-RVR-SQL01")
   severity?: AlertLevel;
   description?: string; // free-text detail
+  // The agent asset (device) the alert is about -- an id from GET /v1/assets/agents.
+  // Optional; must belong to clientId. Links the alert to the device in Gorelo.
+  agentAssetId?: string;
 }
 
 /** Body for POST /v1/tickets. No email field — requires numeric clientId/contactId. */

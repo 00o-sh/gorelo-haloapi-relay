@@ -444,6 +444,45 @@ export class GoreloClient {
   }
 
   /**
+   * The newest open (StatusIds=1) API-type (TypeIds=2) alert for `clientId` created at
+   * or after `since` whose title matches `name` -- how the relay finds the id of an
+   * alert it just raised, since POST /v1/alerts returns no id. Null when none matches.
+   */
+  async findRecentApiAlert(clientId: number, name: string, since: string): Promise<string | null> {
+    const qs = new URLSearchParams({
+      TypeIds: "2",
+      StatusIds: "1",
+      ClientIds: String(clientId),
+      CreatedSince: since,
+      SortOrder: "desc",
+      PageSize: "25",
+    });
+    const raw = await this.getJsonWithRetry<unknown>(`/v1/alerts?${qs.toString()}`, 2);
+    const want = name.trim().toLowerCase();
+    const hit = asArray<{ id?: unknown; title?: unknown }>(unwrap(raw).data).find(
+      (a) => String(a.title ?? "").trim().toLowerCase() === want,
+    );
+    return hit?.id == null ? null : String(hit.id);
+  }
+
+  /**
+   * PATCH /v1/alerts/{alertId} -- set an alert's status: 1 New, 2 Dismissed, 3 Ticketed.
+   * The change applies to the alert's whole stack. Throws GoreloError on non-2xx
+   * (409 when Gorelo refuses the change, e.g. an alert already linked to a ticket).
+   */
+  async updateAlertStatus(alertId: string, statusId: 1 | 2 | 3): Promise<void> {
+    const res = await this.request(`/v1/alerts/${encodeURIComponent(alertId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ StatusId: statusId }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw GoreloError.fromBody(`PATCH /v1/alerts/${alertId} failed`, res.status, body);
+    }
+  }
+
+  /**
    * GET /v1/tickets/{ticketId} -- one ticket's live state (number, status, type, title).
    * Returns null when Gorelo reports it missing (404). Other failures throw.
    */
