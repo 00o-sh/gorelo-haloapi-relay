@@ -444,6 +444,22 @@ export class GoreloClient {
   }
 
   /**
+   * GET /v1/organization/users -- the account's active technicians (StatusIds=2),
+   * one page of up to 200. Used to answer a Halo client's agent list.
+   */
+  async listActiveUsers(): Promise<Array<{ id: number; firstName: string; lastName: string; email: string }>> {
+    const raw = await this.getJsonWithRetry<unknown>("/v1/organization/users?StatusIds=2&PageSize=200", 2);
+    return asArray<{ id?: unknown; firstName?: unknown; lastName?: unknown; email?: unknown }>(unwrap(raw).data)
+      .map((u) => ({
+        id: Number(u.id),
+        firstName: String(u.firstName ?? ""),
+        lastName: String(u.lastName ?? ""),
+        email: String(u.email ?? ""),
+      }))
+      .filter((u) => Number.isInteger(u.id) && u.id > 0);
+  }
+
+  /**
    * The newest open (StatusIds=1) API-type (TypeIds=2) alert for `clientId` created at
    * or after `since` whose title matches `name` -- how the relay finds the id of an
    * alert it just raised, since POST /v1/alerts returns no id. Null when none matches.

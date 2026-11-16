@@ -480,6 +480,35 @@ async function handleTicketTypes(env: Env): Promise<Response> {
 }
 
 /**
+ * GET /api/Agent -- the Gorelo account's active technicians (GET /v1/organization/users)
+ * as Halo agents, so a vendor's assignee picker is populated. Ids are Gorelo user ids.
+ * The relay does not assign tickets from it; an empty list is served if Gorelo fails.
+ */
+async function handleAgents(env: Env): Promise<Response> {
+  let agents: Array<Record<string, unknown>> = [];
+  try {
+    const users = await new GoreloClient(env).listActiveUsers();
+    agents = users.map((u) => {
+      const name = `${u.firstName} ${u.lastName}`.trim() || u.email;
+      return {
+        id: u.id,
+        name,
+        firstname: u.firstName,
+        surname: u.lastName,
+        initials: `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase(),
+        email: u.email,
+        isdisabled: false,
+        use: "agent",
+        team: "",
+      };
+    });
+  } catch (err) {
+    breadcrumb(`HALO agent list failed, serving none ${describeError(err)}`);
+  }
+  return jsonResponse(200, { agents, record_count: agents.length, page_no: 1, page_size: Math.max(agents.length, 100) });
+}
+
+/**
  * The Gorelo type id for a create: the client's `tickettype_id` when it names a real
  * Gorelo type (as offered by handleTicketTypes), else DEFAULT_TYPE_ID. Only a
  * non-default id costs a Gorelo lookup; an unknown or unverifiable id falls back to
@@ -554,6 +583,7 @@ function handleConfig(env: Env, resource: string, url?: URL): Response {
       return jsonResponse(200, GORELO_PRIORITIES.map(([id, name]) => haloPriority(id, name)));
     case "agent":
     case "agents":
+      // Async (live Gorelo technicians) -- answered in handleApi before reaching here.
       return jsonResponse(200, { agents: [], record_count: 0, page_no: 1, page_size: 100 });
     case "lookup": {
       // Bare array of Lookup items, like Halo. Only the severity list has a Gorelo
@@ -1650,6 +1680,7 @@ async function handleApi(
     if (resource === "site" || resource === "sites") return handleSite(env, url);
     if (resource === "asset" || resource === "assets") return handleAsset(env, url);
     if (resource === "tickettype" || resource === "tickettypes") return handleTicketTypes(env);
+    if (resource === "agent" || resource === "agents") return handleAgents(env);
     return handleConfig(env, resource, url);
   }
   return jsonResponse(200, []);

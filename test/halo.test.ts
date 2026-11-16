@@ -40,6 +40,10 @@ function installFetch(): void {
     if (req.method === "GET" && url.pathname === "/v1/tickets/types") {
       return new Response("", { status: 404 });
     }
+    // Same for the technician list behind /api/Agent (falls back to no agents).
+    if (req.method === "GET" && url.pathname === "/v1/organization/users") {
+      return new Response("", { status: 404 });
+    }
     // GET /v1/tickets/{id} (live ticket read) answers 404 unless a test mocks it: the
     // relay falls back to the list scan / its ledger, which is what these tests exercise.
     if (req.method === "GET" && /^\/v1\/tickets\/[0-9a-f-]{36}$/i.test(url.pathname)) {
@@ -608,6 +612,27 @@ describe("Halo lookups (Gorelo-backed)", () => {
       [7046, "Request"],
       [7047, "Proactive"],
     ]);
+  });
+
+  it("GET /api/Agent lists the active Gorelo technicians", async () => {
+    let query = "";
+    routes.push({
+      method: "GET",
+      match: (u) => u.pathname === "/v1/organization/users",
+      handler: (r) => {
+        query = new URL(r.url).search;
+        return json(200, envelope(pascal([{ id: 501, firstName: "Ada", lastName: "Lovelace", email: "ada@x.test" }])));
+      },
+    });
+    const j = (await (await req("/api/Agent")).json()) as { agents: Array<Record<string, unknown>>; record_count: number };
+    expect(query).toContain("StatusIds=2");
+    expect(j.record_count).toBe(1);
+    expect(j.agents[0]).toMatchObject({ id: 501, name: "Ada Lovelace", initials: "AL", email: "ada@x.test" });
+  });
+
+  it("GET /api/Agent serves no agents when Gorelo fails", async () => {
+    const j = (await (await req("/api/Agent")).json()) as { agents: unknown[] };
+    expect(j.agents).toEqual([]);
   });
 
   it("GET /api/Team returns a full-shape bare array", async () => {
