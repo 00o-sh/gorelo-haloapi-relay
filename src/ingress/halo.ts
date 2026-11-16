@@ -20,7 +20,7 @@ import {
   type DeviceFullRow,
 } from "../core/db.js";
 import { notify } from "@ambersecurityinc/notifly";
-import { GoreloClient, GoreloError, extractTicketNumber } from "../core/gorelo.js";
+import { type GoreloTicketDetail, GoreloClient, GoreloError, extractTicketNumber } from "../core/gorelo.js";
 import { breadcrumb, debug, debugOn, describeError } from "../core/log.js";
 import { normalizeEmail } from "../core/parse.js";
 import { assetNum, syncAll } from "./sync.js";
@@ -1002,17 +1002,35 @@ async function recordCreatedTicket(
  * answer stops Huntress from treating the create as failed and retrying (a
  * duplicate source). 404 when we have no record of that id.
  */
+/**
+ * Map a Gorelo status id onto the Halo statuses served at /api/Status (1 New,
+ * 2 In Progress, 3 Resolved, 4 Closed). Gorelo's 1/3/4 are New/Solved/Closed; every
+ * other Gorelo status (Open, On Hold, Waiting on ..., Reopened) is in progress.
+ */
+function haloStatusFromGorelo(statusId: number): number {
+  return statusId === 1 || statusId === 3 || statusId === 4 ? statusId : 2;
+}
+
 async function handleGetTicketById(env: Env, id: number): Promise<Response> {
   const row = await getCreatedTicket(env.DB, id);
   if (!row) return jsonResponse(404, { id, message: "ticket not found" });
+  // Live state from Gorelo (GET /v1/tickets/{id}) so a client's verify/poll sees a
+  // ticket a tech has since solved or reopened; the ledger row is the fallback.
+  let live: GoreloTicketDetail | null = null;
+  if (row.gorelo_id) {
+    live = await new GoreloClient(env)
+      .getTicket(row.gorelo_id, 1)
+      .catch((err) => (breadcrumb(`HALO ticket read-back failed gorelo_id=${row.gorelo_id}: ${describeError(err)}`), null));
+  }
   return jsonResponse(200, {
     id: row.halo_id,
-    summary: row.title ?? "",
+    summary: live?.title ?? row.title ?? "",
     client_id: row.client_id ?? 0,
     site_id: 0,
     user_id: row.contact_id ?? 0,
-    tickettype_id: Number(env.DEFAULT_TYPE_ID),
-    status_id: row.status_id ?? Number(env.DEFAULT_STATUS_ID),
+    tickettype_id: live?.typeId ?? Number(env.DEFAULT_TYPE_ID),
+    status_id:
+      live?.statusId != null ? haloStatusFromGorelo(live.statusId) : (row.status_id ?? Number(env.DEFAULT_STATUS_ID)),
     gorelo_ticket_id: row.gorelo_id,
     gorelo_ticket_number: row.number,
     gorelo_display_number: row.display_number,

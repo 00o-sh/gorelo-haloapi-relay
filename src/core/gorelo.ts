@@ -408,7 +408,7 @@ export class GoreloClient {
    * GET /v1/tickets — the paged ticket list (added to the Gorelo public API in
    * 2026-07). Cursor-paginated; defaults mirror the swagger (pageSize 50, newest
    * `updatedOn` first). Used to read a ticket's human number back after a create
-   * (see resolveTicketNumber) — there is no GET /v1/tickets/{id}.
+   * (see resolveTicketNumber), which now prefers GET /v1/tickets/{id} and keeps this as a fallback.
    */
   async listTickets(
     params?: {
@@ -444,6 +444,34 @@ export class GoreloClient {
   }
 
   /**
+   * GET /v1/tickets/{ticketId} -- one ticket's live state (number, status, type, title).
+   * Returns null when Gorelo reports it missing (404). Other failures throw.
+   */
+  async getTicket(id: string, maxAttempts = 2): Promise<GoreloTicketDetail | null> {
+    let raw: unknown;
+    try {
+      raw = await this.getJsonWithRetry<unknown>(`/v1/tickets/${encodeURIComponent(id)}`, maxAttempts);
+    } catch (err) {
+      if (err instanceof GoreloError && err.status === 404) return null;
+      throw err;
+    }
+    const t = (unwrap(raw).data ?? {}) as Record<string, unknown>;
+    const code = (v: unknown): number | null => {
+      const n = Number((v as { id?: unknown } | null)?.id);
+      return Number.isFinite(n) ? n : null;
+    };
+    return {
+      id: String(t.id ?? id),
+      number: t.number == null ? null : Number(t.number),
+      displayNumber: t.displayNumber == null ? null : String(t.displayNumber),
+      title: t.title == null ? null : String(t.title),
+      statusId: code(t.status),
+      typeId: code(t.type),
+      priorityId: code(t.priority),
+    };
+  }
+
+  /**
    * Read a ticket's human-facing number back from its create-response GUID. The
    * create returns only the `id` (a UUID); the number/displayNumber live on the
    * GET /v1/tickets list items. A just-created ticket sorts to the top by
@@ -455,6 +483,10 @@ export class GoreloClient {
     pageSize = 50,
   ): Promise<{ number: number | null; displayNumber: string | null } | null> {
     if (!id) return null;
+    // Direct read first (GET /v1/tickets/{id}, added to the Gorelo API 2026-11): exact,
+    // and immune to the list-scan race below on a busy account. Falls back to the scan.
+    const direct = await this.getTicket(id, 2).catch(() => null);
+    if (direct && direct.number != null) return { number: direct.number, displayNumber: direct.displayNumber };
     try {
       // Runs inline in the create response path, so bound the retries (one quick
       // retry) — a slow rate-limit backoff would delay the caller for a value we
@@ -467,6 +499,17 @@ export class GoreloClient {
       return null;
     }
   }
+}
+
+/** The subset of GET /v1/tickets/{id} (TicketDetailModel) the relay reads. */
+export interface GoreloTicketDetail {
+  id: string;
+  number: number | null;
+  displayNumber: string | null;
+  title: string | null;
+  statusId: number | null;
+  typeId: number | null;
+  priorityId: number | null;
 }
 
 /** Accept a bare array or a common { items|data|results: [...] } envelope. */

@@ -40,6 +40,11 @@ function installFetch(): void {
     if (req.method === "GET" && url.pathname === "/v1/tickets/types") {
       return new Response("", { status: 404 });
     }
+    // GET /v1/tickets/{id} (live ticket read) answers 404 unless a test mocks it: the
+    // relay falls back to the list scan / its ledger, which is what these tests exercise.
+    if (req.method === "GET" && /^\/v1\/tickets\/[0-9a-f-]{36}$/i.test(url.pathname)) {
+      return new Response("", { status: 404 });
+    }
     throw new Error(`unmocked fetch: ${req.method} ${req.url}`);
   }) as typeof fetch;
 }
@@ -1871,6 +1876,34 @@ describe("Nerdio Manager for MSP (replayed live payloads, 2026-11-16)", () => {
         status_id: number;
       }>();
       expect(row?.status_id).toBe(3);
+    });
+  });
+
+  it("reads the number via GET /v1/tickets/{id} and reports live status on the verify GET", async () => {
+    await withNerdio(async () => {
+      const uuid = "cb83b6cf-959c-4eed-afb8-ba3e18a3c53a";
+      let liveStatus = 1;
+      routes.push({
+        method: "GET",
+        match: (u) => u.pathname === `/v1/tickets/${uuid}`,
+        handler: () =>
+          json(200, envelope(pascal({
+            id: uuid, number: 8300, displayNumber: "8300", title: "From detail",
+            status: { id: liveStatus, name: "x" }, type: { id: 7046, name: "Request" }, priority: { id: 4, name: "Low" },
+          }))),
+      });
+      // The list scan would say 999: the direct read must win.
+      captureGoreloCreate({ uuid, number: 999 });
+      const created = (await (await req("/api/tickets", nerdioInit([{ ...nerdioTicket, tickettype_id: 3 }]))).json()) as { id: number };
+      expect(created.id).toBe(8300);
+
+      liveStatus = 6; // e.g. "On Hold" in Gorelo -> Halo "In Progress" (2)
+      const verify = (await (await req("/api/Tickets/8300", { method: "GET", headers: { "CF-Connecting-IP": NERDIO_IP } })).json()) as Record<string, unknown>;
+      expect(verify).toMatchObject({ id: 8300, status_id: 2, tickettype_id: 7046, summary: "From detail" });
+
+      liveStatus = 3; // Solved in Gorelo -> Halo "Resolved" (3)
+      const solved = (await (await req("/api/Tickets/8300", { method: "GET", headers: { "CF-Connecting-IP": NERDIO_IP } })).json()) as Record<string, unknown>;
+      expect(solved.status_id).toBe(3);
     });
   });
 
