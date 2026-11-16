@@ -62,7 +62,7 @@ ENABLE_NERDIO = "false"
 # outbound addresses in YOUR Azure subscription (see src/ingress/products.ts "nerdio").
 NERDIO_IPS = ""
 ENABLE_CIPP = "false"
-# CIPP source IPs (comma/space separated): your CIPP instance\'s Function App outbound
+# CIPP source IPs (comma/space separated): your CIPP instance's Function App outbound
 # addresses (see src/ingress/products.ts "cipp").
 CIPP_IPS = ""
 
