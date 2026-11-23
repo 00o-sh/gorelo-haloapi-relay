@@ -1236,7 +1236,7 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
     expect(cap.posted()).toMatchObject({ clientId: 999, contactId: null, agentAssetIds: [] });
   });
 
-  it("sends the ticket-created email (and creates unread) only for Helpdesk Buttons with a matched contact", async () => {
+  it("sends the ticket-created email only for Helpdesk Buttons with a matched contact", async () => {
     const prev = (env as { SEND_TICKET_CREATED_EMAIL?: string }).SEND_TICKET_CREATED_EMAIL;
     (env as { SEND_TICKET_CREATED_EMAIL?: string }).SEND_TICKET_CREATED_EMAIL = "true";
     try {
@@ -1271,8 +1271,8 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
       });
       expect(miss.posted()).toMatchObject({ contactId: null, sendTicketCreatedEmail: false });
 
-      // An unidentified source (no product) is not contact-facing: no email, created read,
-      // even with a matched contact.
+      // An unidentified source (no product) is not contact-facing: no email even with a
+      // matched contact, but still created unread.
       routes = [];
       const anon = captureGoreloCreate({ uuid: "22222222-2222-2222-2222-222222222222" });
       const c3 = await req("/tickets", {
@@ -1286,7 +1286,7 @@ describe("Halo deferred ticket create (/tickets queues, /actions creates)", () =
         headers: { "content-type": "application/json", "halo-app-name": "tier2tech" },
         body: JSON.stringify([{ ticket_id: id3, note_html: "y" }]),
       });
-      expect(anon.posted()).toMatchObject({ contactId: 55, sendTicketCreatedEmail: false, isUnread: false });
+      expect(anon.posted()).toMatchObject({ contactId: 55, sendTicketCreatedEmail: false, isUnread: true });
     } finally {
       (env as { SEND_TICKET_CREATED_EMAIL?: string }).SEND_TICKET_CREATED_EMAIL = prev;
     }
@@ -2033,8 +2033,8 @@ describe("CIPP HaloPSA extension (payload shapes per CIPP-API Modules/CippExtens
         contactId: 55,
         priorityId: 2,
         typeId: 7045,
-        // An alert about the user, not raised by them: created read, no email.
-        isUnread: false,
+        // An alert about the user, not raised by them: unread (SLA automations), no email.
+        isUnread: true,
         sendTicketCreatedEmail: false,
       });
     });

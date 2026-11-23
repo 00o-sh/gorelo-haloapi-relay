@@ -216,8 +216,8 @@ export interface CreatePublicTicketCommand {
   sendTicketCreatedEmail: boolean;
   // Swagger: defaults to true; an unread ticket with a contactId also starts the
   // account's "Ticket is unread" automation rules (as a portal submission does).
-  // buildTicketCommand sets it from the product's `contactFacing`; createTicket sends
-  // false when a (queued, older) command omits it.
+  // Always true for relay tickets; createTicket sends true when a (queued, older)
+  // command omits it.
   isUnread?: boolean;
 }
 

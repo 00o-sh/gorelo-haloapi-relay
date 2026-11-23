@@ -1065,9 +1065,9 @@ function buildTicketCommand(
     // no (or the wrong) contact, and an auto-email would notify nobody useful.
     sendTicketCreatedEmail:
       env.SEND_TICKET_CREATED_EMAIL === "true" && product?.contactFacing === true && routing.contactId != null,
-    // Unread starts the account's "Ticket is unread" automations (SLA rules); only for
-    // tickets the user raised themselves.
-    isUnread: product?.contactFacing === true,
+    // Unread starts the account's "Ticket is unread" automations (SLA rules) — for
+    // every product, alerts included.
+    isUnread: true,
   };
 }
 

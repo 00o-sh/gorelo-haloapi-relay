@@ -471,11 +471,12 @@ but the Worker still only asks for it when it **resolved a real client contact**
 never sends the email, so it can't notify the wrong party.
 
 **Contact-facing products:** only a product marked `contactFacing` (Helpdesk Buttons,
-where the user raised the ticket themselves) creates tickets **unread** and may send
-that email. Alert products (Huntress, Nerdio, CIPP) are about a user, not from one:
-their tickets are created read and never email the contact. An unread ticket with a
-contact starts the account's "Ticket is unread" automations (e.g. SLA rules), so those
-run for Helpdesk Buttons tickets only.
+where the user raised the ticket themselves) may send that email. Alert products
+(Huntress, Nerdio, CIPP) are about a user, not from one, and never email the contact.
+
+**Unread:** every relay ticket is created unread (`IsUnread: true`), so the account's
+"Ticket is unread" automations (e.g. SLA rules) run for it. Gorelo only starts those
+rules for a ticket that has a contact.
 
 > **Known Gorelo bug:** even with the flag set, Gorelo currently **ignores**
 > `sendTicketCreatedEmail` and sends no email (reproduced in Gorelo's own Swagger UI).
