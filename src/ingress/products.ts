@@ -71,6 +71,13 @@ export interface Product {
   // left untagged before its own tag is wired up (see resolveTicketTagIds in halo.ts).
   tagVar?: keyof Env;
 
+  // True when this product's tickets are raised BY the end user (Helpdesk Buttons):
+  // the ticket is created unread (so the account's "Ticket is unread" automations,
+  // e.g. SLA rules, run for it) and SEND_TICKET_CREATED_EMAIL may email the contact.
+  // Off by default: an alert product (Huntress, Nerdio, CIPP) is created read and
+  // never emails the user whose account or device the alert is about.
+  contactFacing?: boolean;
+
   // When true, the Halo ticket's `urgency` field carries a Gorelo PriorityId and sets
   // the created ticket's priority (when it is a valid id, 1-4). Nerdio maps its alert
   // severities onto the priorities served at /api/lookup?lookupid=27 and sends the
@@ -127,6 +134,7 @@ export const PRODUCTS: Record<string, Product> = {
     apiAuthorName: "Tier2Tickets",
     mapper: helpdeskButtonsMapper,
     tagVar: "HDB_TAG_ID", // "Submitted VIA HDB"
+    contactFacing: true, // the end user pressed the button: unread + ticket-created email
   },
   // Huntress — additional source IPs + /28 ranges. Opt-in (off by default).
   // Gated on IP AND its self-declared User-Agent ("Huntress Halo Integration").

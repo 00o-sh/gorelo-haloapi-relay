@@ -352,9 +352,10 @@ export class GoreloClient {
       // misspelled ones with a 400. The relay models the command in camelCase and
       // only ever sets documented CreatePublicTicketCommand fields, so pascalizing
       // its keys yields exactly the accepted field set (no stray field introduced).
-      // IsUnread is sent explicitly (Gorelo's default is also true) so relay tickets
-      // always start the account's "Ticket is unread" automations, e.g. SLA rules.
-      body: JSON.stringify(rekey({ isUnread: true, ...cmd }, pascalKey)),
+      // IsUnread is always sent: Gorelo defaults it to true, but only a contact-facing
+      // product's command sets it true (see buildTicketCommand). A command queued
+      // without the field (written before it existed) is created read.
+      body: JSON.stringify(rekey({ isUnread: false, ...cmd }, pascalKey)),
     });
     const body = await res.text().catch(() => "");
     if (!res.ok) {
